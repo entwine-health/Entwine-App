@@ -90,11 +90,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { client.flow.collect(::onSignal) }
     }
 
-    // ---- enrollment (R-ENR-02) -----------------------------------------------
+    // ---- enrollment (R-ENR-05, R-ENR-02): one invite code, nothing else -------
 
-    fun enroll(phone: String, email: String, onResult: (Boolean) -> Unit) {
+    fun enroll(code: String, onResult: (Boolean) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
-            val body = JSONObject().put("phone", phone).put("email", email).toString()
+            val body = JSONObject().put("code", code).toString()
                 .toRequestBody("application/json".toMediaType())
             val req = Request.Builder().url("${BuildConfig.API_BASE}/v1/enroll")
                 .post(body).build()

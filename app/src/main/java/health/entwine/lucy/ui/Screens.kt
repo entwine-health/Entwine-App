@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -47,6 +48,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -72,8 +74,8 @@ fun Root(vm: AppViewModel) {
 
 @Composable
 private fun EnrollScreen(vm: AppViewModel) {
-    var phone by rememberSaveable { mutableStateOf("") }
-    var email by rememberSaveable { mutableStateOf("") }
+    // Invite-only (R-ENR-05): one operator-provided code — no phone/email.
+    var code by rememberSaveable { mutableStateOf("") }
     var failed by rememberSaveable { mutableStateOf(false) }
     var busy by rememberSaveable { mutableStateOf(false) }
     Column(
@@ -87,20 +89,14 @@ private fun EnrollScreen(vm: AppViewModel) {
             modifier = Modifier.fillMaxWidth(0.72f),
         )
         Spacer(Modifier.height(32.dp))
-        Text(stringResource(R.string.enroll_title), fontSize = 26.sp)
+        Text(stringResource(R.string.enroll_title), fontSize = 26.sp, textAlign = TextAlign.Center)
         Spacer(Modifier.height(20.dp))
         OutlinedTextField(
-            value = phone, onValueChange = { phone = it },
-            label = { Text(stringResource(R.string.enroll_phone), fontSize = 18.sp) },
+            value = code, onValueChange = { code = it },
+            label = { Text(stringResource(R.string.enroll_code), fontSize = 18.sp) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-        )
-        Spacer(Modifier.height(12.dp))
-        OutlinedTextField(
-            value = email, onValueChange = { email = it },
-            label = { Text(stringResource(R.string.enroll_email), fontSize = 18.sp) },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         )
         if (failed) {
             Spacer(Modifier.height(8.dp))
@@ -113,9 +109,9 @@ private fun EnrollScreen(vm: AppViewModel) {
         Button(
             onClick = {
                 busy = true
-                vm.enroll(phone, email) { ok -> busy = false; failed = !ok }
+                vm.enroll(code) { ok -> busy = false; failed = !ok }
             },
-            enabled = !busy && phone.length >= 6 && email.contains('@'),
+            enabled = !busy && code.count(Char::isDigit) >= 4,
             modifier = Modifier.fillMaxWidth().heightIn(min = PdDim.target),
         ) { Text(stringResource(R.string.enroll_go), fontSize = 22.sp) }
     }

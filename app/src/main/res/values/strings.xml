@@ -6,11 +6,11 @@
          name inside conversation copy only. -->
     <string name="app_name">Entwine</string>
 
-    <string name="enroll_title">בואו נכיר — פרט אחד ונתחיל</string>
-    <string name="enroll_phone">מספר טלפון</string>
-    <string name="enroll_email">אימייל</string>
+    <!-- Invite-only enrollment (R-ENR-05): one code, no phone/email. -->
+    <string name="enroll_title">קיבלתם קוד הזמנה? נכניס אותו ונתחיל</string>
+    <string name="enroll_code">קוד הזמנה</string>
     <string name="enroll_go">להתחיל</string>
-    <string name="enroll_failed">משהו לא הסתדר. בדקו את הפרטים ונסו שוב.</string>
+    <string name="enroll_failed">הקוד לא תקין או שפג תוקפו. בקשו מהצוות קוד חדש.</string>
 
     <string name="btn_talk">לחצו ודברו</string>
     <string name="btn_stop_talking">סיימתי לדבר</string>
