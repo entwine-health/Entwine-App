@@ -22,10 +22,11 @@ has to be taken on trust; it is in the code.
 ## Security posture — the app holds no keys
 
 **This app contains no server credentials, API keys, or shared secrets.** Search the
-source: the only server values baked in are the public endpoint URLs. The app can only
-talk to the backend using a **per-device token that the server issues at runtime**, after
-enrollment, and which the operator can revoke instantly. Possessing this source — or the
-APK — grants no access to Entwine's backend or to anyone's data.
+source: the only server values baked in are the public endpoint URLs. Enrollment is
+**invite-only** — the backend issues a per-device token only in exchange for a
+**single-use, time-limited invite code** minted by the care team, and that token can be
+revoked instantly. Possessing this source — or the APK — grants no access to Entwine's
+backend or to anyone's data.
 
 ## Build
 
