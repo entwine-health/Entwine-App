@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hebrew-first: default locale IS Hebrew (R-LNG-01). All strings are
+     PLACEHOLDERS pending the Q-23 micro-copy table from the CPO. -->
+<resources>
+    <!-- Brand wordmark stays Latin in every locale; Lucy remains the persona
+         name inside conversation copy only. -->
+    <string name="app_name">Entwine</string>
+
+    <string name="enroll_title">בואו נכיר — פרט אחד ונתחיל</string>
+    <string name="enroll_phone">מספר טלפון</string>
+    <string name="enroll_email">אימייל</string>
+    <string name="enroll_go">להתחיל</string>
+    <string name="enroll_failed">משהו לא הסתדר. בדקו את הפרטים ונסו שוב.</string>
+
+    <string name="btn_talk">לחצו ודברו</string>
+    <string name="btn_stop_talking">סיימתי לדבר</string>
+    <string name="btn_stop_playback">עצרו את לוסי</string>
+    <string name="btn_thinking">לוסי חושבת…</string>
+    <string name="btn_send">שליחה</string>
+    <string name="btn_end_session">סיום שיחה</string>
+    <string name="btn_retry">נסו שוב</string>
+
+    <!-- R-UXA-08: destructive tap gated by a second, separated confirm tap. -->
+    <string name="end_confirm_q">לסיים את השיחה?</string>
+    <string name="end_confirm_yes">כן, לסיים</string>
+    <string name="end_confirm_no">להמשיך</string>
+
+    <string name="motor_on">מרגיש/ה טוב</string>
+    <string name="motor_shifting">משתנה</string>
+    <string name="motor_off">תקוע/ה</string>
+    <string name="motor_logged">נרשם ✓</string>
+
+    <string name="crisis_headline">אתם לא לבד. אפשר לדבר עם מישהו עכשיו.</string>
+    <string name="crisis_eran">ער״ן — קו חם</string>
+    <string name="crisis_emergency">מד״א 101</string>
+    <string name="crisis_continue">להמשיך לדבר עם לוסי</string>
+
+    <string name="offline_copy">אין חיבור כרגע. הטקסט שלכם נשמר.</string>
+    <string name="err_generic">משהו השתבש. אפשר לנסות שוב או לכתוב.</string>
+    <string name="err_stt">לא שמעתי טוב. נסו שוב או כתבו לי.</string>
+    <string name="cap_suggest">אולי נסיים להיום? אפשר להמשיך אם תרצו.</string>
+
+    <string name="btn_feedback">משוב</string>
+    <string name="fb_title">ספרו לנו</string>
+    <string name="fb_text_label">מה תרצו למסור?</string>
+    <string name="fb_record">הקליטו הודעה</string>
+    <string name="fb_stop_rec">עצרו הקלטה</string>
+    <string name="fb_send">שליחה</string>
+    <string name="fb_cancel">ביטול</string>
+    <string name="fb_sent">התקבל, תודה!</string>
+    <string name="fb_fail">השליחה נכשלה — נסו שוב.</string>
+
+    <string name="update_needed">יש גרסה חדשה — בקשו מהצוות את הקישור המעודכן.</string>
+
+    <string name="nudge_title">לוסי כאן</string>
+    <string name="nudge_text">יש לכם רגע לשיחה קצרה?</string>
+</resources>

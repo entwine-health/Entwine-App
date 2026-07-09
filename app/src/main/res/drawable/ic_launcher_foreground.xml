@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Entwine "E" mark: three horizontal strokes, geometry from the website
+     favicon.svg (32-box) scaled into the 108dp adaptive-icon safe zone.
+     Doubles as the notification small icon (white on transparent). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M35.25,42.75 L72.75,42.75"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5.25"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M40.88,54 L67.13,54"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5.25"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M37.13,65.25 L70.88,65.25"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5.25"
+        android:strokeLineCap="round" />
+</vector>
