@@ -24,6 +24,10 @@ data class SessionConfig(
     val endpointDefault: String,
     val showSttEcho: Boolean = true,
     val minAppVersion: String = "0.0.0",
+    // WS v1.6 (ADR-0013): "tap" | "speech" + monitor tuning, all server-owned.
+    val bargeIn: String = "tap",
+    val bargeInMinSpeechMs: Int = 300,
+    val bargeInRmsThreshold: Int = 1600,
 )
 
 /** Server → client messages the app reacts to (SDD §4). */
@@ -38,6 +42,8 @@ sealed interface ServerMsg {
     data class SttFinal(val exchangeSeq: Int, val text: String) : ServerMsg
     data class ReplyDelta(val exchangeSeq: Int, val text: String) : ServerMsg
     data class ReplyDone(val exchangeSeq: Int) : ServerMsg
+    data class UtteranceEndpoint(val reason: String) : ServerMsg // WS v1.6, R-LOOP-10
+    data class TurnCancelled(val exchangeSeq: Int) : ServerMsg // WS v1.6, barge-in ack
     data class TtsBegin(val exchangeSeq: Int, val sampleRate: Int) : ServerMsg
     data class TtsDone(val exchangeSeq: Int) : ServerMsg
     data class MotorAck(val textKey: String) : ServerMsg
@@ -82,6 +88,11 @@ fun parseServerMsg(text: String): ServerMsg {
                     showSttEcho = cfg?.get("show_stt_echo")?.jsonPrimitive?.boolean ?: true,
                     minAppVersion = cfg?.get("min_app_version")?.jsonPrimitive?.content
                         ?: "0.0.0",
+                    bargeIn = cfg?.get("barge_in")?.jsonPrimitive?.content ?: "tap",
+                    bargeInMinSpeechMs = cfg?.get("barge_in_min_speech_ms")
+                        ?.jsonPrimitive?.int ?: 300,
+                    bargeInRmsThreshold = cfg?.get("barge_in_rms_threshold")
+                        ?.jsonPrimitive?.int ?: 1600,
                 ),
             )
         }
@@ -92,6 +103,10 @@ fun parseServerMsg(text: String): ServerMsg {
             seq(), obj["sample_rate"]?.jsonPrimitive?.int ?: 24000
         )
         "tts.done" -> ServerMsg.TtsDone(seq())
+        "utterance.endpoint" -> ServerMsg.UtteranceEndpoint(
+            obj["reason"]?.jsonPrimitive?.content ?: "wrap_phrase"
+        )
+        "turn.cancelled" -> ServerMsg.TurnCancelled(seq())
         "motor.ack" -> ServerMsg.MotorAck(obj["text_key"]?.jsonPrimitive?.content ?: "")
         "crisis.show" -> ServerMsg.CrisisShow(seq(), targets(obj, "targets"))
         "cap.suggest" -> ServerMsg.CapSuggest(seq())
@@ -136,6 +151,10 @@ object ClientMsg {
 
     fun ackPlaybackStart(exchangeSeq: Int, clientTs: String): String = buildJsonObject {
         put("t", "ack.playback_start"); put("exchange_seq", exchangeSeq); put("client_ts", clientTs)
+    }.toString()
+
+    fun bargeIn(exchangeSeq: Int): String = buildJsonObject {
+        put("t", "barge_in"); put("exchange_seq", exchangeSeq)
     }.toString()
 
     fun sessionClose(): String = buildJsonObject {

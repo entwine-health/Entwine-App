@@ -160,6 +160,60 @@ class Recorder(private val codec: WireCodec, private val scope: CoroutineScope) 
     }
 }
 
+/**
+ * Barge-in speech-onset monitor (ADR-0013, matrix I6): runs ONLY during
+ * RESPONDING when the server config says `barge_in: "speech"`. Uses the
+ * VOICE_COMMUNICATION source so the platform echo canceller subtracts Lucy's
+ * own playback. Frames feed the RMS detector and die here — nothing is sent,
+ * nothing is stored (R-LOG-02).
+ */
+class SpeechOnsetMonitor(private val scope: CoroutineScope) {
+    private var job: Job? = null
+
+    @SuppressLint("MissingPermission") // RECORD_AUDIO gated by the UI flow
+    fun start(rmsThreshold: Double, minSpeechMs: Int, onSpeech: () -> Unit) {
+        stop()
+        val samplesPerFrame = MIC_SAMPLE_RATE * FRAME_MS / 1000
+        val minBuf = AudioRecord.getMinBufferSize(
+            MIC_SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT
+        )
+        job = scope.launch(Dispatchers.IO) {
+            val rec = AudioRecord(
+                MediaRecorder.AudioSource.VOICE_COMMUNICATION, // platform AEC on this session
+                MIC_SAMPLE_RATE,
+                AudioFormat.CHANNEL_IN_MONO,
+                AudioFormat.ENCODING_PCM_16BIT,
+                maxOf(minBuf, samplesPerFrame * 4),
+            )
+            val buf = ShortArray(samplesPerFrame)
+            var speechMs = 0
+            try {
+                rec.startRecording()
+                while (isActive) {
+                    val n = rec.read(buf, 0, buf.size)
+                    if (n <= 0) continue
+                    var acc = 0.0
+                    for (i in 0 until n) acc += buf[i].toDouble() * buf[i].toDouble()
+                    val rms = kotlin.math.sqrt(acc / n)
+                    speechMs = if (rms >= rmsThreshold) speechMs + FRAME_MS else 0
+                    if (speechMs >= minSpeechMs) {
+                        onSpeech()
+                        break
+                    }
+                }
+            } finally {
+                runCatching { rec.stop() }
+                rec.release()
+            }
+        }
+    }
+
+    fun stop() {
+        job?.cancel()
+        job = null
+    }
+}
+
 /** Streamed reply playback: first chunk starts audio immediately (R-LAT-03). */
 class Player(private val codec: WireCodec) {
     private var track: AudioTrack? = null

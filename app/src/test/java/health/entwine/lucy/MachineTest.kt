@@ -86,3 +86,53 @@ class MachineTest {
         assertEquals(listOf(Action.TTS_STOP), t.actions)
     }
 }
+
+// ---- WS v1.6 rows (matrix v1.2): wrap fast-path + speech barge-in ----------
+
+class MachineV16Test {
+
+    @Test fun `server endpoint ends recording as wrap phrase`() {
+        val t = reduce(AppState.Recording, Event.ServerEndpoint, TARGETS)
+        assertEquals(AppState.Processing, t.next)
+        assertEquals(listOf(Action.MIC_OFF, Action.SEND_UTTER_END_WRAP), t.actions)
+    }
+
+    @Test fun `server endpoint outside recording is ignored`() {
+        for (s in listOf(AppState.IdleReady, AppState.Processing, AppState.Responding)) {
+            val t = reduce(s, Event.ServerEndpoint, TARGETS)
+            assertEquals(s, t.next)
+            assertTrue(t.actions.isEmpty())
+        }
+    }
+
+    // Barge-in leg 1: stop audio + send barge_in, but the mic must NOT start yet
+    // (WS §8.1 — the in-flight lock releases only on turn.cancelled).
+    @Test fun `speech barge-in stops playback but keeps state until cancelled`() {
+        val t = reduce(AppState.Responding, Event.SpeechBargeIn, TARGETS)
+        assertEquals(AppState.Responding, t.next)
+        assertEquals(
+            listOf(Action.TTS_STOP, Action.SUPPRESS_REPLY, Action.SEND_BARGE_IN), t.actions
+        )
+        assertTrue(Action.MIC_ON !in t.actions)
+    }
+
+    // Barge-in leg 2: turn.cancelled opens the new utterance.
+    @Test fun `turn cancelled flows into recording`() {
+        val t = reduce(AppState.Responding, Event.TurnCancelled, TARGETS)
+        assertEquals(AppState.Recording, t.next)
+        assertEquals(listOf(Action.SEND_UTTER_START, Action.MIC_ON), t.actions)
+    }
+
+    @Test fun `turn cancelled elsewhere is ignored`() {
+        for (s in listOf(AppState.IdleReady, AppState.Recording, AppState.Processing)) {
+            val t = reduce(s, Event.TurnCancelled, TARGETS)
+            assertEquals(s, t.next)
+            assertTrue(t.actions.isEmpty())
+        }
+    }
+
+    @Test fun `crisis still outranks barge-in flow in responding`() {
+        val t = reduce(AppState.Responding, Event.CrisisShown, TARGETS)
+        assertIs<AppState.Crisis>(t.next)
+    }
+}

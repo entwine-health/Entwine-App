@@ -22,6 +22,9 @@ sealed interface Event {
     data object TapStop : Event // recording stop OR playback skip, context-dependent
     data object VadSilence : Event
     data object MaxUtterance : Event
+    data object ServerEndpoint : Event // utterance.endpoint — wrap fast-path (WS v1.6, R-LOOP-10)
+    data object SpeechBargeIn : Event // monitor mic heard the user during playback (ADR-0013)
+    data object TurnCancelled : Event // turn.cancelled — barge-in acknowledged, lock released
     data class TextSend(val text: String) : Event
     data object EndSessionTap : Event
     data object CrisisShown : Event // crisis.show received — carries targets via ctx
@@ -40,8 +43,8 @@ sealed interface Event {
 /** Cleanup vocabulary from matrix §2 — executed by the runtime, decided here. */
 enum class Action {
     MIC_ON, MIC_OFF, FLUSH_MIC, DROP_MIC, TTS_STOP, SEND_UTTER_START,
-    SEND_UTTER_END_VAD, SEND_UTTER_END_TAP, SEND_TEXT, SEND_CLOSE,
-    PERSIST_TEXT, RECONNECT, EXIT_APP, SUPPRESS_REPLY,
+    SEND_UTTER_END_VAD, SEND_UTTER_END_TAP, SEND_UTTER_END_WRAP, SEND_TEXT, SEND_CLOSE,
+    PERSIST_TEXT, RECONNECT, EXIT_APP, SUPPRESS_REPLY, SEND_BARGE_IN,
 }
 
 data class Transition(val next: AppState, val actions: List<Action>)
@@ -82,6 +85,9 @@ fun reduce(state: AppState, event: Event, crisisTargets: List<CrisisTarget>): Tr
             Event.MaxUtterance -> Transition( // 90 s runaway-mic guard
                 AppState.Processing, listOf(Action.MIC_OFF, Action.SEND_UTTER_END_TAP)
             )
+            Event.ServerEndpoint -> Transition( // wrap fast-path (matrix v1.2, R-LOOP-10)
+                AppState.Processing, listOf(Action.MIC_OFF, Action.SEND_UTTER_END_WRAP)
+            )
             // The hard cell: drop mid-utterance = deliberate discard, user re-speaks (§3.3).
             Event.WsDrop -> Transition(
                 AppState.Offline,
@@ -109,6 +115,14 @@ fun reduce(state: AppState, event: Event, crisisTargets: List<CrisisTarget>): Tr
         AppState.Responding -> when (event) {
             Event.TtsPlaybackDone -> Transition(AppState.IdleReady, emptyList())
             Event.TapStop -> Transition(AppState.IdleReady, listOf(Action.TTS_STOP)) // skip ≠ error
+            // Barge-in pair (matrix v1.2, ADR-0013): stop audio + ask the server to
+            // cancel, but the mic must NOT start until turn.cancelled (WS §8.1).
+            Event.SpeechBargeIn -> Transition(
+                state, listOf(Action.TTS_STOP, Action.SUPPRESS_REPLY, Action.SEND_BARGE_IN)
+            )
+            Event.TurnCancelled -> Transition(
+                AppState.Recording, listOf(Action.SEND_UTTER_START, Action.MIC_ON)
+            )
             Event.WsDrop -> Transition( // play out buffer while reconnecting (§2)
                 AppState.Offline, listOf(Action.PERSIST_TEXT, Action.RECONNECT)
             )

@@ -9,6 +9,7 @@ import health.entwine.lucy.audio.EnergyVad
 import health.entwine.lucy.audio.PassthroughPcm16
 import health.entwine.lucy.audio.Player
 import health.entwine.lucy.audio.Recorder
+import health.entwine.lucy.audio.SpeechOnsetMonitor
 import health.entwine.lucy.proto.ClientMsg
 import health.entwine.lucy.proto.CrisisTarget
 import health.entwine.lucy.proto.ServerMsg
@@ -76,6 +77,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var vadSilenceMs = 2000
     private var currentSeq = 0
     private var suppressReply = false
+
+    // Barge-in (ADR-0013): server-owned gate + monitor tuning (session.ready).
+    private var bargeInMode = "tap"
+    private var bargeInMinSpeechMs = 300
+    private var bargeInRmsThreshold = 1600.0
+    private val bargeMonitor = SpeechOnsetMonitor(viewModelScope)
 
     private val client = SessionClient(
         url = BuildConfig.WS_URL,
@@ -168,9 +175,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun dispatch(event: Event) {
-        val t = reduce(_ui.value.state, event, crisisTargets)
+        val prev = _ui.value.state
+        val t = reduce(prev, event, crisisTargets)
         _ui.value = _ui.value.copy(state = t.next, errorKey = null)
         t.actions.forEach(::execute)
+        // Monitor mic lifecycle (matrix I6): alive exactly while RESPONDING in
+        // speech mode; entering by transition only, never re-armed mid-state.
+        if (t.next is AppState.Responding && prev !is AppState.Responding &&
+            bargeInMode == "speech"
+        ) {
+            bargeMonitor.start(bargeInRmsThreshold, bargeInMinSpeechMs) {
+                dispatch(Event.SpeechBargeIn)
+            }
+        } else if (t.next !is AppState.Responding) {
+            bargeMonitor.stop()
+        }
     }
 
     private fun execute(action: Action) {
@@ -200,6 +219,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 client.send(ClientMsg.utteranceEnd(recorder.capturedMs, "vad_silence"))
             Action.SEND_UTTER_END_TAP ->
                 client.send(ClientMsg.utteranceEnd(recorder.capturedMs, "tap"))
+            Action.SEND_UTTER_END_WRAP -> // server-initiated endpoint (WS v1.6, R-LOOP-10)
+                client.send(ClientMsg.utteranceEnd(recorder.capturedMs, "wrap_phrase"))
+            Action.SEND_BARGE_IN -> {
+                // Playback already stopped (TTS_STOP ordering in the matrix row);
+                // mic waits for turn.cancelled per WS §8.1.
+                bargeMonitor.stop()
+                client.send(ClientMsg.bargeIn(currentSeq))
+            }
             Action.SEND_TEXT -> Unit // text carried by sendText below
             Action.SEND_CLOSE -> client.send(ClientMsg.sessionClose())
             Action.PERSIST_TEXT -> Unit // Compose field persists via Store on change
@@ -260,6 +287,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             is ServerMsg.Ready -> {
                 crisisTargets = msg.config.crisisTargets.ifEmpty { BAKED_TARGETS }
                 vadSilenceMs = msg.config.vadSilenceMs
+                bargeInMode = msg.config.bargeIn
+                bargeInMinSpeechMs = msg.config.bargeInMinSpeechMs
+                bargeInRmsThreshold = msg.config.bargeInRmsThreshold.toDouble()
                 _ui.value = _ui.value.copy(
                     updateNeeded = versionBelow(
                         BuildConfig.VERSION_NAME, msg.config.minAppVersion
@@ -293,6 +323,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
             is ServerMsg.TtsBegin -> player.begin(msg.sampleRate)
             is ServerMsg.TtsDone -> dispatch(Event.TtsPlaybackDone)
+            is ServerMsg.UtteranceEndpoint -> // wrap fast-path (WS v1.6, R-LOOP-10)
+                dispatch(Event.ServerEndpoint)
+            is ServerMsg.TurnCancelled -> {
+                suppressReply = false // cancelled exchange's stragglers already dropped
+                _ui.value = _ui.value.copy(partialReply = "")
+                dispatch(Event.TurnCancelled)
+            }
             is ServerMsg.MotorAck -> _ui.value = _ui.value.copy(motorChip = msg.textKey)
             is ServerMsg.CrisisShow -> {
                 crisisTargets = msg.targets.ifEmpty { crisisTargets }
@@ -310,6 +347,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     override fun onCleared() {
         recorder.stop()
+        bargeMonitor.stop()
         player.stop()
         client.close()
     }
