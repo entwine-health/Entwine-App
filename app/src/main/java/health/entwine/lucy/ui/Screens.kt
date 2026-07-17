@@ -122,13 +122,11 @@ private fun ConversationScreen(ui: UiSlice, vm: AppViewModel) {
     var composed by rememberSaveable { mutableStateOf("") }
     var showFeedback by rememberSaveable { mutableStateOf(false) }
     var endArm by rememberSaveable { mutableStateOf(false) }
-    // R-UXA-14: OFF/Shifting reported → all touch targets and gaps grow.
-    val s = if (ui.bigMode) PdDim.OFF_MODE_SCALE else 1f
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             OutlinedButton(
                 onClick = { showFeedback = true },
-                modifier = Modifier.heightIn(min = PdDim.target * s),
+                modifier = Modifier.heightIn(min = PdDim.target),
             ) {
                 Text(stringResource(R.string.btn_feedback), fontSize = 16.sp)
             }
@@ -176,7 +174,7 @@ private fun ConversationScreen(ui: UiSlice, vm: AppViewModel) {
         // coequal color-differentiated states; Q-07 validates).
         Row(
             Modifier.fillMaxWidth().padding(vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(PdDim.rowGap * s),
+            horizontalArrangement = Arrangement.spacedBy(PdDim.rowGap),
         ) {
             listOf(
                 Triple("ON", R.string.motor_on, EntwineCyan),
@@ -185,7 +183,7 @@ private fun ConversationScreen(ui: UiSlice, vm: AppViewModel) {
             ).forEach { (state, label, tint) ->
                 OutlinedButton(
                     onClick = { vm.motorTap(state) },
-                    modifier = Modifier.weight(1f).heightIn(min = PdDim.target * s),
+                    modifier = Modifier.weight(1f).heightIn(min = PdDim.target),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = tint),
                     border = BorderStroke(2.dp, tint),
                 ) { Text(stringResource(label), fontSize = 18.sp, textAlign = TextAlign.Center) }
@@ -220,7 +218,7 @@ private fun ConversationScreen(ui: UiSlice, vm: AppViewModel) {
             Button(
                 onClick = action,
                 shape = CircleShape,
-                modifier = Modifier.size(PdDim.talkDiameter * s),
+                modifier = Modifier.size(PdDim.talkDiameter),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (ui.state is AppState.Recording) EntwineCoral
                     else MaterialTheme.colorScheme.primary
@@ -246,7 +244,7 @@ private fun ConversationScreen(ui: UiSlice, vm: AppViewModel) {
             Button(
                 onClick = { vm.sendText(composed); composed = "" },
                 enabled = ui.state is AppState.IdleReady && composed.isNotBlank(),
-                modifier = Modifier.heightIn(min = PdDim.target * s),
+                modifier = Modifier.heightIn(min = PdDim.target),
             ) { Text(stringResource(R.string.btn_send), fontSize = 18.sp) }
         }
 
@@ -264,19 +262,19 @@ private fun ConversationScreen(ui: UiSlice, vm: AppViewModel) {
             ) {
                 Button(
                     onClick = { endArm = false; vm.dispatch(Event.EndSessionTap) },
-                    modifier = Modifier.weight(1f).heightIn(min = PdDim.target * s),
+                    modifier = Modifier.weight(1f).heightIn(min = PdDim.target),
                     colors = ButtonDefaults.buttonColors(containerColor = EntwineCoral),
                 ) { Text(stringResource(R.string.end_confirm_yes), fontSize = 18.sp) }
                 OutlinedButton(
                     onClick = { endArm = false },
-                    modifier = Modifier.weight(1f).heightIn(min = PdDim.target * s),
+                    modifier = Modifier.weight(1f).heightIn(min = PdDim.target),
                 ) { Text(stringResource(R.string.end_confirm_no), fontSize = 18.sp) }
             }
         } else {
             OutlinedButton(
                 onClick = { endArm = true },
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
-                    .heightIn(min = PdDim.target * s),
+                    .heightIn(min = PdDim.target),
             ) { Text(stringResource(R.string.btn_end_session), fontSize = 18.sp) }
         }
     }

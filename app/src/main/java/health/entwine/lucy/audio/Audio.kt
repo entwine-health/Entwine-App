@@ -220,6 +220,7 @@ class Player(private val codec: WireCodec) {
 
     fun begin(sampleRate: Int) {
         stop()
+        pending = ByteArray(0) // never carry a byte across replies
         track = AudioTrack.Builder()
             .setAudioAttributes(
                 AudioAttributes.Builder()
@@ -240,8 +241,19 @@ class Player(private val codec: WireCodec) {
             .also { it.play() }
     }
 
+    // Reason: PCM16 samples may straddle two frames. Decoding each frame alone
+    // dropped the dangling byte, so every later sample was assembled from the
+    // wrong two bytes — full-scale static after the first word (2026-07-17).
+    // The server now sends aligned frames; this keeps playback correct even if
+    // some future carrier does not.
+    private var pending = ByteArray(0)
+
     fun feed(payload: ByteArray) {
-        val pcm = codec.decode(payload)
+        val buf = if (pending.isEmpty()) payload else pending + payload
+        val whole = buf.size - buf.size % 2
+        pending = if (whole == buf.size) ByteArray(0) else buf.copyOfRange(whole, buf.size)
+        if (whole == 0) return
+        val pcm = codec.decode(if (whole == buf.size) buf else buf.copyOfRange(0, whole))
         track?.write(pcm, 0, pcm.size)
     }
 

@@ -60,7 +60,6 @@ data class UiSlice(
     val updateNeeded: Boolean = false,
     val showSttEcho: Boolean = true,
     val micLevel: Float = 0f, // live input meter while recording (R-UXA-10)
-    val bigMode: Boolean = false, // OFF/Shifting reported → enlarged targets (R-UXA-14)
 )
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
@@ -114,6 +113,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }.getOrDefault(false)
             _ui.value = _ui.value.copy(enrolled = ok || _ui.value.enrolled)
+            // Reason: onCreate's openSession() ran before this device had a
+            // token and returned without a socket, so a freshly enrolled app
+            // stayed mute until a restart — every send dropped, the turn hung
+            // on "Lucy is thinking" (found live 2026-07-17). Enrolment is the
+            // moment the token exists; connect now.
+            if (ok) openSession()
             onResult(ok)
         }
     }
@@ -254,10 +259,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun motorTap(state: String) {
         // Out-of-band by contract (R-MOT-01): no dispatch, capture untouched.
+        // R-UXA-14 (SRS v1.9): reporting a state never re-lays-out the screen —
+        // targets are permanently at the enlarged geometry (PdDim), so nothing
+        // moves under a hand that is already struggling.
         client.send(ClientMsg.motorTap(state, Instant.now().toString()))
-        // R-UXA-14: controls must stay operable in the state they report —
-        // OFF/Shifting enlarges targets/spacing until the user reports ON.
-        _ui.value = _ui.value.copy(bigMode = state != "ON")
     }
 
     // ---- server signals → events ------------------------------------------------

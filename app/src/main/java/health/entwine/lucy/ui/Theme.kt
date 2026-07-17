@@ -8,7 +8,10 @@ package health.entwine.lucy.ui
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 
 // Website :root tokens.
 val EntwineCyan = Color(0xFF00E5FF) // --brand-cyan
@@ -39,8 +42,17 @@ private val Scheme = darkColorScheme(
     outlineVariant = Color(0xFF3A3A3C),
 )
 
-/** App-wide Material3 theme carrying the Entwine brand palette. */
+/** App-wide Material3 theme carrying the Entwine brand palette, RTL-locked.
+ *
+ * # Reason: Lucy is Hebrew-first by spec, but layout direction otherwise
+ * follows the *device* locale — an English-locale phone rendered every Hebrew
+ * screen left-to-right (found 2026-07-17). The patient's phone settings must
+ * never decide Lucy's layout, so the direction is pinned here rather than
+ * inherited.
+ */
 @Composable
 fun EntwineTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = Scheme, content = content)
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+        MaterialTheme(colorScheme = Scheme, content = content)
+    }
 }
