@@ -21,6 +21,8 @@ import health.entwine.lucy.store.Store
 import health.entwine.lucy.ws.SessionClient
 import health.entwine.lucy.ws.WsSignal
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -42,6 +44,12 @@ fun versionBelow(current: String, minimum: String): Boolean {
     }
     return false
 }
+
+/** Longest single awaited hop inside PROCESSING (WS §7: utterance.end → stt.final). */
+private const val PHASE_TIMEOUT_MS = 15_000L
+
+/** Grace for `session.saved` before exiting anyway (matrix §Closing). */
+private const val SAVED_TIMEOUT_MS = 5_000L
 
 /** Baked-in national fallbacks — used only if no session.ready ever cached (WS §5.3). */
 val BAKED_TARGETS = listOf(
@@ -76,6 +84,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var vadSilenceMs = 2000
     private var currentSeq = 0
     private var suppressReply = false
+    private var watchdog: Job? = null
 
     // Barge-in (ADR-0013): server-owned gate + monitor tuning (session.ready).
     private var bargeInMode = "tap"
@@ -183,7 +192,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val prev = _ui.value.state
         val t = reduce(prev, event, crisisTargets)
         _ui.value = _ui.value.copy(state = t.next, errorKey = null)
-        t.actions.forEach(::execute)
+        // Reason: a send that never reached the socket means no answer is
+        // coming, so the turn would hang forever with an inert button (found
+        // live 2026-07-17). Treat undeliverable as the drop it actually is.
+        val delivered = t.actions.map(::execute).all { it }
+        armWatchdog(t.next)
         // Monitor mic lifecycle (matrix I6): alive exactly while RESPONDING in
         // speech mode; entering by transition only, never re-armed mid-state.
         if (t.next is AppState.Responding && prev !is AppState.Responding &&
@@ -195,9 +208,46 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         } else if (t.next !is AppState.Responding) {
             bargeMonitor.stop()
         }
+        if (!delivered) dispatch(Event.WsDrop)
     }
 
-    private fun execute(action: Action) {
+    /** Client-side phase watchdog — matrix I5, WS §7. Never let a state that
+     *  waits on the server become a dead end.
+     *
+     *  # Reason: PROCESSING and CLOSING both hand control to the server and
+     *  have no local escape. When the socket was silently dead the app sat on
+     *  "לוסי חושבת" forever with a no-op button, and End-session wedged the
+     *  same way (found live 2026-07-17). The reducer always had the exits —
+     *  RecoverableError and SavedTimeout — but nothing ever fired them.
+     */
+    private fun armWatchdog(state: AppState) {
+        watchdog?.cancel()
+        // WS §7: the longest single awaited hop in PROCESSING is 15 s
+        // (utterance.end → stt.final); matrix §Closing allows 5 s for
+        // session.saved. Any server message re-arms the timer, so this only
+        // fires on real silence — never on slow-but-alive synthesis.
+        val timeoutMs = when (state) {
+            AppState.Processing -> PHASE_TIMEOUT_MS
+            AppState.Closing -> SAVED_TIMEOUT_MS
+            else -> return
+        }
+        watchdog = viewModelScope.launch {
+            delay(timeoutMs)
+            if (state == AppState.Closing) {
+                dispatch(Event.SavedTimeout)
+            } else {
+                dispatch(Event.RecoverableError)
+                _ui.value = _ui.value.copy(errorKey = "err_llm") // dispatch clears it first
+            }
+        }
+    }
+
+    /** Re-arm on any server traffic: the turn is alive, only slow. */
+    private fun touchWatchdog() {
+        if (_ui.value.state is AppState.Processing) armWatchdog(AppState.Processing)
+    }
+
+    private fun execute(action: Action): Boolean {
         when (action) {
             Action.MIC_ON -> recorder.start(
                 vad = EnergyVad(vadSilenceMs),
@@ -219,25 +269,26 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             Action.FLUSH_MIC -> Unit // folded into SEND_UTTER_END_*
             Action.TTS_STOP -> player.stop()
             Action.SUPPRESS_REPLY -> suppressReply = true
-            Action.SEND_UTTER_START -> client.send(ClientMsg.utteranceStart())
+            Action.SEND_UTTER_START -> return client.send(ClientMsg.utteranceStart())
             Action.SEND_UTTER_END_VAD ->
-                client.send(ClientMsg.utteranceEnd(recorder.capturedMs, "vad_silence"))
+                return client.send(ClientMsg.utteranceEnd(recorder.capturedMs, "vad_silence"))
             Action.SEND_UTTER_END_TAP ->
-                client.send(ClientMsg.utteranceEnd(recorder.capturedMs, "tap"))
+                return client.send(ClientMsg.utteranceEnd(recorder.capturedMs, "tap"))
             Action.SEND_UTTER_END_WRAP -> // server-initiated endpoint (WS v1.6, R-LOOP-10)
-                client.send(ClientMsg.utteranceEnd(recorder.capturedMs, "wrap_phrase"))
+                return client.send(ClientMsg.utteranceEnd(recorder.capturedMs, "wrap_phrase"))
             Action.SEND_BARGE_IN -> {
                 // Playback already stopped (TTS_STOP ordering in the matrix row);
                 // mic waits for turn.cancelled per WS §8.1.
                 bargeMonitor.stop()
-                client.send(ClientMsg.bargeIn(currentSeq))
+                return client.send(ClientMsg.bargeIn(currentSeq))
             }
             Action.SEND_TEXT -> Unit // text carried by sendText below
-            Action.SEND_CLOSE -> client.send(ClientMsg.sessionClose())
+            Action.SEND_CLOSE -> return client.send(ClientMsg.sessionClose())
             Action.PERSIST_TEXT -> Unit // Compose field persists via Store on change
             Action.RECONNECT -> Unit // SessionClient reconnects on failure callbacks
             Action.EXIT_APP -> Unit // Activity observes Closing terminal state
         }
+        return true
     }
 
     fun sendText(text: String) {
@@ -247,7 +298,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             transcript = _ui.value.transcript + ("me" to text), partialReply = ""
         )
         dispatch(Event.TextSend(text))
-        client.send(ClientMsg.textMessage(text))
+        // Reason: SEND_TEXT carries no payload through execute(), so this send
+        // is the one the reducer cannot check — an undelivered text turn would
+        // hang exactly like the voice one did.
+        if (!client.send(ClientMsg.textMessage(text))) dispatch(Event.WsDrop)
         viewModelScope.launch { store.setComposedText("") }
     }
 
@@ -268,6 +322,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // ---- server signals → events ------------------------------------------------
 
     private fun onSignal(sig: WsSignal) {
+        touchWatchdog() // any traffic proves the turn is alive, only slow
         when (sig) {
             is WsSignal.Message -> onServer(sig.msg)
             is WsSignal.TtsChunk -> {
@@ -343,14 +398,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             is ServerMsg.CapSuggest -> _ui.value = _ui.value.copy(capSuggested = true)
             is ServerMsg.Saved -> dispatch(Event.SessionSaved)
             is ServerMsg.Error -> {
-                _ui.value = _ui.value.copy(errorKey = msg.userMessageKey)
+                // Reason: dispatch() clears errorKey, so setting it first meant
+                // the server's own copy never reached the screen (R-LOOP-03).
                 if (msg.recoverable) dispatch(Event.RecoverableError)
+                _ui.value = _ui.value.copy(errorKey = msg.userMessageKey)
             }
             is ServerMsg.Unknown -> Unit
         }
     }
 
     override fun onCleared() {
+        watchdog?.cancel()
         recorder.stop()
         bargeMonitor.stop()
         player.stop()
