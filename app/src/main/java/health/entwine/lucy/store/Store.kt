@@ -3,12 +3,16 @@
 package health.entwine.lucy.store
 
 import android.content.Context
+import android.content.SharedPreferences
+import android.util.Log
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import kotlinx.coroutines.flow.first
+import java.io.IOException
+import java.security.GeneralSecurityException
 import java.time.LocalTime
 
 private val Context.dataStore by preferencesDataStore(name = "lucy")
@@ -22,12 +26,31 @@ class Store(private val ctx: Context) {
     // Reason: the device credential must survive in hardware-backed storage,
     // never plain prefs (R-SEC-02).
     private val secure by lazy {
+        try {
+            createSecure()
+        } catch (e: GeneralSecurityException) {
+            resetSecure(e)
+        } catch (e: IOException) {
+            resetSecure(e)
+        }
+    }
+
+    private fun createSecure(): SharedPreferences =
         EncryptedSharedPreferences.create(
             ctx, "lucy_secure",
             MasterKey.Builder(ctx).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build(),
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
         )
+
+    // Reason: a lucy_secure file restored from backup (or a wiped Keystore) is
+    // ciphertext under a master key this device no longer has — undecryptable
+    // forever. Dropping it loses only the device token, which the server can
+    // re-issue via a fresh invite (R-ENR-05); crashing at launch loses the app.
+    private fun resetSecure(cause: Exception): SharedPreferences {
+        Log.w("Store", "secure prefs unreadable — resetting to enrol state", cause)
+        ctx.deleteSharedPreferences("lucy_secure")
+        return createSecure()
     }
 
     var deviceToken: String?

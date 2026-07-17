@@ -11,8 +11,14 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
+    <!-- allowBackup=false (R-SEC-02): the device token must never ride Google
+         cloud backup — and a restored lucy_secure file is undecryptable anyway
+         (its Keystore master key dies with the uninstall), which crashed every
+         fresh install until the user cleared data. Enrollment state lives
+         server-side; a reinstall just needs a fresh invite (R-ENR-05). -->
     <application
         android:label="@string/app_name"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
