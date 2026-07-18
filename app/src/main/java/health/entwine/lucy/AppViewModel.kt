@@ -70,6 +70,13 @@ data class UiSlice(
     val micLevel: Float = 0f, // live input meter while recording (R-UXA-10)
     // R-LNG-01: session language — MainActivity derives locale + layout direction.
     val lang: String = "he",
+    // Cosmetic presence flag: Lucy audio is playing (incl. server-initiated
+    // scripted turns where the state machine stays IdleReady — the to_solve #10
+    // residue). Drives the TalkOrb speaking visual, never the state matrix.
+    val lucySpeaking: Boolean = false,
+    // Set after a successful in-app deletion request (R-DEL-04) — the enroll
+    // screen shows the confirmation once.
+    val deletedDone: Boolean = false,
 )
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
@@ -110,6 +117,27 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             ClientMsg.sessionOpen(BuildConfig.VERSION_NAME, client.lastSessionId)
         }
         viewModelScope.launch { client.flow.collect(::onSignal) }
+    }
+
+    // ---- account deletion request (R-DEL-04) ---------------------------------
+
+    fun deleteAccount(onResult: (Boolean) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val req = Request.Builder().url("${BuildConfig.API_BASE}/v1/account/delete")
+                .header("Authorization", "Bearer ${store.deviceToken}")
+                .post(ByteArray(0).toRequestBody(null)).build()
+            val ok = runCatching {
+                http.newCall(req).execute().use { it.isSuccessful }
+            }.getOrDefault(false)
+            if (ok) {
+                // Collection stopped server-side; drop the dead token and return
+                // to the enroll screen with the one-time confirmation.
+                store.deviceToken = null
+                client.close()
+                _ui.value = UiSlice(enrolled = false, deletedDone = true, lang = _ui.value.lang)
+            }
+            launch(Dispatchers.Main) { onResult(ok) }
+        }
     }
 
     // ---- enrollment (R-ENR-05, R-ENR-02): one invite code, nothing else -------
@@ -398,11 +426,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     dispatch(Event.TtsPlaybackDone)
                 }
             }
-            is ServerMsg.TtsBegin -> player.begin(msg.sampleRate)
-            is ServerMsg.TtsDone -> dispatch(Event.TtsPlaybackDone)
+            is ServerMsg.TtsBegin -> {
+                _ui.value = _ui.value.copy(lucySpeaking = true)
+                player.begin(msg.sampleRate)
+            }
+            is ServerMsg.TtsDone -> {
+                _ui.value = _ui.value.copy(lucySpeaking = false)
+                dispatch(Event.TtsPlaybackDone)
+            }
             is ServerMsg.UtteranceEndpoint -> // wrap fast-path (WS v1.6, R-LOOP-10)
                 dispatch(Event.ServerEndpoint)
             is ServerMsg.TurnCancelled -> {
+                _ui.value = _ui.value.copy(lucySpeaking = false)
                 suppressReply = false // cancelled exchange's stragglers already dropped
                 _ui.value = _ui.value.copy(partialReply = "")
                 dispatch(Event.TurnCancelled)

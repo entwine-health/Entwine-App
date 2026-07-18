@@ -20,6 +20,10 @@ val EntwineYellow = Color(0xFFFFCC00) // transition accent (ON/SHIFTING/OFF char
 val EntwineDim = Color(0xFF8E8E93) // --text-dimmed
 val EntwineCard = Color(0xFF0A0A0C) // --card-inner
 val EntwineBorder = Color(0xFF1C1C1E) // --border-gray
+// Deep cyan-tinted disc for the talk orb's "Lucy holds the floor" states —
+// derived from the brand cyan at low luminance (2026-07-18 UI round; white
+// text on it clears the R-UXA-13 7:1 bar).
+val EntwineCyanDeep = Color(0xFF0E2A30)
 
 private val Scheme = darkColorScheme(
     primary = EntwineCyan,

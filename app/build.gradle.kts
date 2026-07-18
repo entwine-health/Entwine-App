@@ -32,8 +32,8 @@ android {
         applicationId = "health.entwine.lucy"
         minSdk = 31
         targetSdk = 35
-        versionCode = 10
-        versionName = "0.5.4"
+        versionCode = 11
+        versionName = "0.6.0"
     }
     buildTypes {
         debug { applicationIdSuffix = ".debug" }

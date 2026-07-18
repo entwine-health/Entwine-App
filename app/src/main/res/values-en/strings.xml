@@ -52,4 +52,16 @@
 
     <string name="nudge_title">Lucy is here</string>
     <string name="nudge_text">Do you have a moment for a short talk?</string>
+
+    <!-- Server-initiated speech caption (Session-0 / language ask). -->
+    <string name="lucy_speaking">Lucy is speaking…</string>
+
+    <!-- In-app data deletion (R-DEL-04). -->
+    <string name="delete_entry">Delete all my data</string>
+    <string name="delete_title">Delete everything?</string>
+    <string name="delete_copy">All your conversations, summaries, and profile will be permanently erased within a few days, and collection stops immediately. This cannot be undone. To use Lucy again you\'ll need a new invite code from the team.</string>
+    <string name="delete_confirm">Yes, delete everything</string>
+    <string name="delete_cancel">No, back to the conversation</string>
+    <string name="delete_done">Request received. Collection has stopped and your data will be erased within a few days.</string>
+    <string name="delete_failed">Deletion didn\'t complete — check the connection and try again.</string>
 </resources>
