@@ -42,17 +42,18 @@ private val Scheme = darkColorScheme(
     outlineVariant = Color(0xFF3A3A3C),
 )
 
-/** App-wide Material3 theme carrying the Entwine brand palette, RTL-locked.
+/** App-wide Material3 theme carrying the Entwine brand palette; direction app-owned.
  *
- * # Reason: Lucy is Hebrew-first by spec, but layout direction otherwise
- * follows the *device* locale — an English-locale phone rendered every Hebrew
- * screen left-to-right (found 2026-07-17). The patient's phone settings must
- * never decide Lucy's layout, so the direction is pinned here rather than
- * inherited.
+ * # Reason: layout direction follows the SESSION language, never the device
+ * locale (R-UXA-19 as amended, R-LNG-01) — an English-locale phone rendered
+ * every Hebrew screen left-to-right (found 2026-07-17), and a Hebrew-locale
+ * phone must not force an English session RTL. The server's session language
+ * is the single source of truth.
  */
 @Composable
-fun EntwineTheme(content: @Composable () -> Unit) {
-    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+fun EntwineTheme(lang: String = "he", content: @Composable () -> Unit) {
+    val direction = if (lang == "he") LayoutDirection.Rtl else LayoutDirection.Ltr
+    CompositionLocalProvider(LocalLayoutDirection provides direction) {
         MaterialTheme(colorScheme = Scheme, content = content)
     }
 }

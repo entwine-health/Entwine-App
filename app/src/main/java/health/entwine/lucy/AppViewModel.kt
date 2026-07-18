@@ -68,6 +68,8 @@ data class UiSlice(
     val updateNeeded: Boolean = false,
     val showSttEcho: Boolean = true,
     val micLevel: Float = 0f, // live input meter while recording (R-UXA-10)
+    // R-LNG-01: session language — MainActivity derives locale + layout direction.
+    val lang: String = "he",
 )
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
@@ -78,6 +80,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val player = Player(codec)
 
     private val _ui = MutableStateFlow(UiSlice(enrolled = store.deviceToken != null))
+
+    init {
+        // R-LNG-01: last known session language applies from launch (pre-ready).
+        viewModelScope.launch { _ui.value = _ui.value.copy(lang = store.lang()) }
+    }
     val ui: StateFlow<UiSlice> = _ui
 
     private var crisisTargets: List<CrisisTarget> = BAKED_TARGETS
@@ -358,7 +365,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         BuildConfig.VERSION_NAME, msg.config.minAppVersion
                     ),
                     showSttEcho = msg.config.showSttEcho,
+                    lang = msg.config.lang,
                 )
+                viewModelScope.launch { store.setLang(msg.config.lang) }
                 if (_ui.value.state is AppState.Offline) dispatch(Event.ReconnectOk)
             }
             is ServerMsg.SttFinal -> {
@@ -405,6 +414,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
             is ServerMsg.CapSuggest -> _ui.value = _ui.value.copy(capSuggested = true)
             is ServerMsg.Saved -> dispatch(Event.SessionSaved)
+            is ServerMsg.LanguageUpdated -> { // WS v1.9 (R-LNG-03): live locale flip
+                _ui.value = _ui.value.copy(lang = msg.lang)
+                viewModelScope.launch { store.setLang(msg.lang) }
+            }
             is ServerMsg.Error -> {
                 // Reason: dispatch() clears errorKey, so setting it first meant
                 // the server's own copy never reached the screen (R-LOOP-03).

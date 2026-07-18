@@ -29,6 +29,8 @@ data class SessionConfig(
     val bargeIn: String = "tap",
     val bargeInMinSpeechMs: Int = 300,
     val bargeInRmsThreshold: Int = 1600,
+    // WS v1.9 (R-LNG-01): session language — drives app locale + direction.
+    val lang: String = "he",
 )
 
 /** Server → client messages the app reacts to (SDD §4). */
@@ -51,6 +53,9 @@ sealed interface ServerMsg {
     data class CrisisShow(val exchangeSeq: Int, val targets: List<CrisisTarget>) : ServerMsg
     data class CapSuggest(val exchangeSeq: Int) : ServerMsg
     data class Saved(val sessionId: String, val exchangeCount: Int) : ServerMsg
+
+    // WS v1.9 (R-LNG-03): mid-session language flip — locale/direction follow live.
+    data class LanguageUpdated(val lang: String) : ServerMsg
     data class Error(
         val code: String,
         val recoverable: Boolean,
@@ -94,6 +99,7 @@ fun parseServerMsg(text: String): ServerMsg {
                         ?.jsonPrimitive?.int ?: 300,
                     bargeInRmsThreshold = cfg?.get("barge_in_rms_threshold")
                         ?.jsonPrimitive?.int ?: 1600,
+                    lang = cfg?.get("lang")?.jsonPrimitive?.content ?: "he",
                 ),
             )
         }
@@ -118,6 +124,9 @@ fun parseServerMsg(text: String): ServerMsg {
         "session.saved" -> ServerMsg.Saved(
             obj["session_id"]?.jsonPrimitive?.content ?: "",
             obj["exchange_count"]?.jsonPrimitive?.int ?: 0,
+        )
+        "language.updated" -> ServerMsg.LanguageUpdated(
+            obj["lang"]?.jsonPrimitive?.content ?: "he"
         )
         "error" -> ServerMsg.Error(
             code = obj["code"]?.jsonPrimitive?.content ?: "E_UNKNOWN",

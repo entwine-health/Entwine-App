@@ -4,6 +4,7 @@ package health.entwine.lucy
 
 import android.Manifest
 import android.content.Intent
+import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
 import android.os.PowerManager
@@ -12,9 +13,15 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import health.entwine.lucy.state.Event
 import health.entwine.lucy.ui.EntwineTheme
 import health.entwine.lucy.ui.Root
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     private val vm: AppViewModel by viewModels()
@@ -25,7 +32,20 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { EntwineTheme { Root(vm) } }
+        setContent {
+            // R-LNG-01: session language drives strings locale + layout direction,
+            // live (language.updated recomposes — no activity recreate needed).
+            val ui by vm.ui.collectAsState()
+            val base = LocalContext.current
+            val localized = remember(ui.lang) {
+                val cfg = Configuration(base.resources.configuration)
+                cfg.setLocale(Locale(ui.lang))
+                base.createConfigurationContext(cfg)
+            }
+            CompositionLocalProvider(LocalContext provides localized) {
+                EntwineTheme(ui.lang) { Root(vm) }
+            }
+        }
         permissions.launch(
             arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS)
         )

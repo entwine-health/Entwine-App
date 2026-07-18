@@ -21,6 +21,7 @@ private val K_COMPOSED = stringPreferencesKey("composed_text")
 private val K_QUIET = stringPreferencesKey("quiet_time")
 private val K_LAST_DAY = stringPreferencesKey("last_session_day")
 private val K_CRISIS = stringPreferencesKey("crisis_targets_json")
+private val K_LANG = stringPreferencesKey("session_lang") // R-LNG-01: last known session language
 
 class Store(private val ctx: Context) {
     // Reason: the device credential must survive in hardware-backed storage,
@@ -62,6 +63,12 @@ class Store(private val ctx: Context) {
 
     suspend fun setComposedText(v: String) {
         ctx.dataStore.edit { it[K_COMPOSED] = v } // survives process death (I2)
+    }
+
+    suspend fun lang(): String = ctx.dataStore.data.first()[K_LANG] ?: "he"
+
+    suspend fun setLang(v: String) {
+        ctx.dataStore.edit { it[K_LANG] = v } // locale applies before session.ready next launch
     }
 
     suspend fun quietTime(): LocalTime? =

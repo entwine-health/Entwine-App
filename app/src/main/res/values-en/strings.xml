@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- English strings (R-LNG-01, program R3 2026-07-18). Engineering drafts —
+     ride the Q-23 strings table (Lucy_Strings_v1.md) like the Hebrew set.
+     Crisis targets stay the server-configured numbers (per-country, R-LNG-06);
+     these labels render whatever the server sends. -->
+<resources>
+    <string name="app_name">Entwine</string>
+
+    <string name="enroll_title">Got an invite code? Enter it and we\'ll begin</string>
+    <string name="enroll_code">Invite code</string>
+    <string name="enroll_go">Start</string>
+    <string name="enroll_failed">That code is invalid or expired. Ask the team for a new one.</string>
+
+    <string name="btn_talk">Press and talk</string>
+    <string name="btn_stop_talking">I\'m done talking</string>
+    <string name="btn_stop_playback">Stop Lucy</string>
+    <string name="btn_thinking">Lucy is thinking…</string>
+    <string name="btn_send">Send</string>
+    <string name="btn_end_session">End conversation</string>
+    <string name="btn_retry">Try again</string>
+
+    <string name="end_confirm_q">End the conversation?</string>
+    <string name="end_confirm_yes">Yes, end it</string>
+    <string name="end_confirm_no">Keep talking</string>
+
+    <string name="motor_on">Feeling good</string>
+    <string name="motor_shifting">In between</string>
+    <string name="motor_off">Stuck</string>
+    <string name="motor_logged">Noted ✓</string>
+
+    <string name="crisis_headline">You are not alone. You can talk to someone right now.</string>
+    <string name="crisis_eran">ERAN — crisis line</string>
+    <string name="crisis_emergency">Emergency 101</string>
+    <string name="crisis_continue">Keep talking with Lucy</string>
+
+    <string name="offline_copy">No connection right now. Your text is saved.</string>
+    <string name="err_generic">Something went wrong. Try again or type instead.</string>
+    <string name="err_stt">I didn\'t hear that well. Try again or write to me.</string>
+    <string name="cap_suggest">Shall we wrap up for today? We can continue if you like.</string>
+
+    <string name="btn_feedback">Feedback</string>
+    <string name="fb_title">Tell us</string>
+    <string name="fb_text_label">What would you like to share?</string>
+    <string name="fb_record">Record a message</string>
+    <string name="fb_stop_rec">Stop recording</string>
+    <string name="fb_send">Send</string>
+    <string name="fb_cancel">Cancel</string>
+    <string name="fb_sent">Received, thank you!</string>
+    <string name="fb_fail">Sending failed — try again.</string>
+
+    <string name="update_needed">A new version is available — ask the team for the updated link.</string>
+
+    <string name="nudge_title">Lucy is here</string>
+    <string name="nudge_text">Do you have a moment for a short talk?</string>
+</resources>
