@@ -214,6 +214,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Client-side phase watchdog — matrix I5, WS §7. Never let a state that
      *  waits on the server become a dead end.
      *
+     *  Implements: R-LOOP-03 (the app never strands the user on a server-
+     *  dependent state; SDD_App_State_Matrix I5, SDD_WS_Protocol §7).
+     *
      *  # Reason: PROCESSING and CLOSING both hand control to the server and
      *  have no local escape. When the socket was silently dead the app sat on
      *  "לוסי חושבת" forever with a no-op button, and End-session wedged the
@@ -378,8 +381,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         partialReply = "",
                     )
                 }
-                // Text-only turn (no TTS in echo mode): finish the exchange.
-                if (_ui.value.state is AppState.Processing) dispatch(Event.TtsPlaybackDone)
+                // Finish the exchange ONLY when no audio follows (echo/text-only).
+                // Full-mode replies end on tts.done; finishing here would flip the
+                // UI to idle mid-playback — talk button live, barge-in gone, a tap
+                // rejected as a double turn (R-LOOP-07; found 2026-07-18).
+                if (!msg.hasTts && _ui.value.state is AppState.Processing) {
+                    dispatch(Event.TtsPlaybackDone)
+                }
             }
             is ServerMsg.TtsBegin -> player.begin(msg.sampleRate)
             is ServerMsg.TtsDone -> dispatch(Event.TtsPlaybackDone)

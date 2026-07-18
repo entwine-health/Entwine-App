@@ -241,6 +241,7 @@ class Player(private val codec: WireCodec) {
             .also { it.play() }
     }
 
+    // Implements: SDD_WS_Protocol v1.8 §2 (whole-sample framing invariant).
     // Reason: PCM16 samples may straddle two frames. Decoding each frame alone
     // dropped the dangling byte, so every later sample was assembled from the
     // wrong two bytes — full-scale static after the first word (2026-07-17).

@@ -6,6 +6,7 @@ package health.entwine.lucy.proto
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
@@ -41,7 +42,7 @@ sealed interface ServerMsg {
 
     data class SttFinal(val exchangeSeq: Int, val text: String) : ServerMsg
     data class ReplyDelta(val exchangeSeq: Int, val text: String) : ServerMsg
-    data class ReplyDone(val exchangeSeq: Int) : ServerMsg
+    data class ReplyDone(val exchangeSeq: Int, val hasTts: Boolean) : ServerMsg
     data class UtteranceEndpoint(val reason: String) : ServerMsg // WS v1.6, R-LOOP-10
     data class TurnCancelled(val exchangeSeq: Int) : ServerMsg // WS v1.6, barge-in ack
     data class TtsBegin(val exchangeSeq: Int, val sampleRate: Int) : ServerMsg
@@ -98,7 +99,11 @@ fun parseServerMsg(text: String): ServerMsg {
         }
         "stt.final" -> ServerMsg.SttFinal(seq(), obj["text"]?.jsonPrimitive?.content ?: "")
         "reply.delta" -> ServerMsg.ReplyDelta(seq(), obj["text"]?.jsonPrimitive?.content ?: "")
-        "reply.done" -> ServerMsg.ReplyDone(seq())
+        // has_tts absent → false = legacy echo/text-only semantics (reply.done
+        // ends the turn); full-mode server sends true when audio follows.
+        "reply.done" -> ServerMsg.ReplyDone(
+            seq(), obj["has_tts"]?.jsonPrimitive?.booleanOrNull ?: false
+        )
         "tts.begin" -> ServerMsg.TtsBegin(
             seq(), obj["sample_rate"]?.jsonPrimitive?.int ?: 24000
         )
