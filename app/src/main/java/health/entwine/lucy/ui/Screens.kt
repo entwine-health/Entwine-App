@@ -36,6 +36,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -117,15 +118,21 @@ private fun ConversationScreen(ui: UiSlice, vm: AppViewModel, onDeleteRequest: (
                 Triple("SHIFTING", R.string.motor_shifting, EntwineYellow),
                 Triple("OFF", R.string.motor_off, EntwineCoral),
             ).forEach { (state, label, tint) ->
+                // FB-19c: the last-reported state stays filled with a ✓ so the user
+                // can see "you are here" all session, not just a transient flash.
+                val selected = ui.motorState == state
                 OutlinedButton(
                     onClick = { vm.motorTap(state) },
                     shape = RoundedCornerShape(20.dp),
                     modifier = Modifier.weight(1f).heightIn(min = PdDim.target),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = tint),
-                    border = BorderStroke(2.dp, tint),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = if (selected) tint else Color.Transparent,
+                        contentColor = if (selected) Color.Black else tint,
+                    ),
+                    border = if (selected) null else BorderStroke(2.dp, tint),
                 ) {
                     Text(
-                        stringResource(label),
+                        (if (selected) "✓ " else "") + stringResource(label),
                         fontSize = 18.sp,
                         lineHeight = 24.sp,
                         textAlign = TextAlign.Center,

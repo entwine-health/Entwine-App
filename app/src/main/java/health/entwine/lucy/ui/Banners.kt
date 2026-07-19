@@ -54,7 +54,10 @@ fun ErrorBanner(key: String) {
         "err_resync" -> R.string.err_resync
         else -> R.string.err_generic
     }
-    NoticeBanner(androidx.compose.ui.res.stringResource(res), edge = EntwineCoral)
+    // FB-19f: recoverable hiccups use the calm/dim edge, NEVER the alarm red
+    // (EntwineCoral = recording + crisis family). A "try again" must not read as
+    // an emergency; the crisis screen stays the only red-alarm surface.
+    NoticeBanner(androidx.compose.ui.res.stringResource(res), edge = EntwineDim)
 }
 
 @Composable

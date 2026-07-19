@@ -79,6 +79,10 @@ data class UiSlice(
     val transcript: List<Pair<String, String>> = emptyList(), // (who, text)
     val partialReply: String = "",
     val motorChip: String? = null,
+    // FB-19c: the currently-reported motor state ("ON"|"SHIFTING"|"OFF"), so the
+    // three buttons show a persistent "you are here" mark — not just the transient
+    // "נרשם ✓". Set optimistically on tap; the server also records it (motor_states).
+    val motorState: String? = null,
     val capSuggested: Boolean = false,
     val errorKey: String? = null,
     val updateNeeded: Boolean = false,
@@ -132,6 +136,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var currentSeq = 0
     private var suppressReply = false
     private var watchdog: Job? = null
+    private var errorDismiss: Job? = null
 
     // Barge-in (ADR-0013): server-owned gate + monitor tuning (session.ready).
     private var bargeInMode = "tap"
@@ -308,12 +313,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 dispatch(Event.SavedTimeout)
             } else {
                 dispatch(Event.RecoverableError)
-                _ui.value = _ui.value.copy(errorKey = "err_llm") // dispatch clears it first
+                flashError("err_llm") // dispatch clears it first
             }
         }
     }
 
     /** Re-arm on any server traffic: the turn is alive, only slow. */
+    /** Show a recoverable error, then fade it (FB-19f). A hiccup must not strand
+     *  the user on a persistent banner — after a few seconds the screen returns to
+     *  the normal orb. Any new dispatch also clears it (dispatch → errorKey=null). */
+    private fun flashError(key: String) {
+        errorDismiss?.cancel()
+        _ui.value = _ui.value.copy(errorKey = key)
+        errorDismiss = viewModelScope.launch {
+            delay(5_000)
+            if (_ui.value.errorKey == key) _ui.value = _ui.value.copy(errorKey = null)
+        }
+    }
+
     private fun touchWatchdog() {
         if (_ui.value.state is AppState.Processing) armWatchdog(AppState.Processing)
     }
@@ -414,6 +431,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // R-UXA-14 (SRS v1.9): reporting a state never re-lays-out the screen —
         // targets are permanently at the enlarged geometry (PdDim), so nothing
         // moves under a hand that is already struggling.
+        // FB-19c: mark it selected immediately so the user can see what they last
+        // reported for the rest of the session (server persists it too).
+        _ui.value = _ui.value.copy(motorState = state)
         client.send(ClientMsg.motorTap(state, Instant.now().toString()))
     }
 
@@ -520,7 +540,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 // Reason: dispatch() clears errorKey, so setting it first meant
                 // the server's own copy never reached the screen (R-LOOP-03).
                 if (msg.recoverable) dispatch(Event.RecoverableError)
-                _ui.value = _ui.value.copy(errorKey = msg.userMessageKey)
+                flashError(msg.userMessageKey)
             }
             is ServerMsg.Unknown -> Unit
         }
