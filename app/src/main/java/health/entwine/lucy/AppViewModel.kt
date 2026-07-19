@@ -51,6 +51,16 @@ fun versionBelow(current: String, minimum: String): Boolean {
     return false
 }
 
+/** Phone UI language collapsed to the app's supported set — Hebrew (the default
+ *  resources) or English (`values-en`, the fallback for every other locale).
+ *  Used ONLY for the pre-enrollment intro screen (FB-1); once a session exists
+ *  the server's session language wins (R-LNG-01, SDD carries the amendment). */
+fun deviceLang(): String =
+    when (java.util.Locale.getDefault().language) {
+        "he", "iw" -> "he" // Android still emits the legacy "iw" tag for Hebrew
+        else -> "en"
+    }
+
 /** Longest single awaited hop inside PROCESSING (WS §7: utterance.end → stt.final). */
 private const val PHASE_TIMEOUT_MS = 15_000L
 
@@ -95,11 +105,25 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val recorder = Recorder(codec, viewModelScope)
     private val player = Player(codec)
 
-    private val _ui = MutableStateFlow(UiSlice(enrolled = store.deviceToken != null))
+    private val _ui = MutableStateFlow(
+        UiSlice(
+            enrolled = store.deviceToken != null,
+            // FB-1 (2026-07-19): the intro/invite screen has no session yet, so it
+            // must follow the PHONE language + direction — not the baked Hebrew
+            // default (an English phone showed the Hebrew RTL invite screen). Set
+            // synchronously so there is no Hebrew flash before the first frame.
+            // Once enrolled, the server session language is the source of truth.
+            lang = if (store.deviceToken != null) "he" else deviceLang(),
+        )
+    )
 
     init {
-        // R-LNG-01: last known session language applies from launch (pre-ready).
-        viewModelScope.launch { _ui.value = _ui.value.copy(lang = store.lang()) }
+        // R-LNG-01: an enrolled device restores its last known SESSION language
+        // from launch (pre-ready); a not-yet-enrolled device keeps deviceLang()
+        // above until enrollment brings a session.ready (FB-1).
+        if (store.deviceToken != null) {
+            viewModelScope.launch { _ui.value = _ui.value.copy(lang = store.lang()) }
+        }
     }
     val ui: StateFlow<UiSlice> = _ui
 

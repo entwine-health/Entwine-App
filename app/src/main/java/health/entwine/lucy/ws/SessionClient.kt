@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
@@ -36,6 +37,11 @@ class SessionClient(
 ) {
     private val http = client ?: OkHttpClient.Builder()
         .pingInterval(20, TimeUnit.SECONDS)
+        // Reason: pin HTTP/1.1 for the upgrade. OkHttp already forces h1 for
+        // WebSockets, but stating it removes ALPN negotiation (Cloudflare offers
+        // h2/h3) as a suspect for a handshake that never reaches origin — the
+        // "stuck on Lucy thinking" class (FB-2, 2026-07-19).
+        .protocols(listOf(Protocol.HTTP_1_1))
         .build()
 
     @Volatile private var ws: WebSocket? = null
@@ -55,8 +61,15 @@ class SessionClient(
         ws = http.newWebSocket(req, Listener(openMsg))
     }
 
-    fun send(text: String): Boolean = ws?.send(text) ?: false
-    fun send(bytes: ByteArray): Boolean = ws?.send(bytes.toByteString()) ?: false
+    // Reason: newWebSocket() hands back a live handle BEFORE the handshake
+    // completes, so ws.send() enqueues (returns true) into a socket that may
+    // never open — the app then advances to "Lucy is thinking" and waits on a
+    // reply that cannot come (FB-2, 2026-07-19). Gate on the onOpen truth: an
+    // unestablished socket reports the send as undelivered, and the ViewModel
+    // turns that into WsDrop → Offline/reconnect instead of an indefinite hang.
+    fun send(text: String): Boolean = if (opened) ws?.send(text) ?: false else false
+    fun send(bytes: ByteArray): Boolean =
+        if (opened) ws?.send(bytes.toByteString()) ?: false else false
 
     fun close() {
         ws?.close(1000, null)
