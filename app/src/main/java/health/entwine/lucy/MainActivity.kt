@@ -4,6 +4,7 @@ package health.entwine.lucy
 
 import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
@@ -13,12 +14,24 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
+import health.entwine.lucy.ui.EntwineCyan
 import health.entwine.lucy.state.Event
 import health.entwine.lucy.ui.EntwineTheme
 import health.entwine.lucy.ui.Root
@@ -30,9 +43,16 @@ class MainActivity : ComponentActivity() {
     // Grant result feeds the mic state (a denied mic must show a fix path, never a
     // dead recording); the battery-exemption prompt is deferred to post-enrollment
     // so it no longer fires over the unread invite screen.
+    // FB-20f: a one-shot callback chained after the runtime-permission dialogs so
+    // the first-run sequence can continue (→ battery exemption → open the gate).
+    private var onPermsResult: (() -> Unit)? = null
     private val permissions = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { vm.refreshMicState() }
+    ) {
+        vm.refreshMicState()
+        onPermsResult?.invoke()
+        onPermsResult = null
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -50,16 +70,39 @@ class MainActivity : ComponentActivity() {
             // enrolled — nudges (its only purpose) are meaningless pre-enrollment,
             // and the system screen must not ambush a first-run user. Re-fires are
             // harmless: askBatteryExemption() no-ops once already exempt.
-            LaunchedEffect(ui.enrolled) { if (ui.enrolled) askBatteryExemption() }
-            CompositionLocalProvider(LocalContext provides localized) {
-                EntwineTheme(ui.lang) { Root(vm) }
+            // FB-20f: on a fresh install request EVERY permission up front — before
+            // the invite screen — so the mic / notification / battery prompts never
+            // surface at random times mid-conversation. An enrolled or already-
+            // granted device skips straight through.
+            var permsGate by remember { mutableStateOf(ui.enrolled || micGranted()) }
+            LaunchedEffect(Unit) {
+                if (!permsGate) firstRunPermissions { permsGate = true }
             }
+            CompositionLocalProvider(LocalContext provides localized) {
+                EntwineTheme(ui.lang) {
+                    if (permsGate) Root(vm) else SetupScreen()
+                }
+            }
+        }
+        vm.openSession()
+    }
+
+    /** First-run permission sequence (FB-20f): the mic + notification dialog, then
+     *  the battery-exemption screen, then open the gate to the invite screen — so
+     *  everything is asked once, up front, never at random times mid-use. */
+    private fun firstRunPermissions(onDone: () -> Unit) {
+        onPermsResult = {
+            askBatteryExemption() // OEM-killer guard (R-NOT-04), still pre-enrollment
+            onDone()
         }
         permissions.launch(
             arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS)
         )
-        vm.openSession()
     }
+
+    private fun micGranted(): Boolean = ContextCompat.checkSelfPermission(
+        this, Manifest.permission.RECORD_AUDIO
+    ) == PackageManager.PERMISSION_GRANTED
 
     override fun onResume() {
         super.onResume()
@@ -82,5 +125,16 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         super.onStop()
         vm.dispatch(Event.AppBackground) // never record in background (matrix)
+    }
+}
+
+/** Brief holding screen shown behind the first-run permission dialogs (FB-20f),
+ *  before the invite screen appears. */
+@Composable
+private fun SetupScreen() {
+    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = EntwineCyan)
+        }
     }
 }
