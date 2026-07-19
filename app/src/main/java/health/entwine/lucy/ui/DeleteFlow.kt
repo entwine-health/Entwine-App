@@ -12,8 +12,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -78,11 +80,19 @@ fun DeleteConfirmScreen(vm: AppViewModel, onCancel: () -> Unit) {
                 colors = ButtonDefaults.buttonColors(containerColor = EntwineCoral),
                 modifier = Modifier.fillMaxWidth().heightIn(min = PdDim.target),
             ) {
-                Text(
-                    stringResource(R.string.delete_confirm),
-                    fontSize = 20.sp,
-                    color = Color.Black,
-                )
+                if (busy) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = Color.Black,
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Text(
+                        stringResource(R.string.delete_confirm),
+                        fontSize = 20.sp,
+                        color = Color.Black,
+                    )
+                }
             }
             Spacer(Modifier.height(PdDim.targetGap))
             OutlinedButton(

@@ -2,9 +2,9 @@
 <!-- Hebrew-first: default locale IS Hebrew (R-LNG-01). All strings are
      PLACEHOLDERS pending the Q-23 micro-copy table from the CPO. -->
 <resources>
-    <!-- Brand wordmark stays Latin in every locale; Lucy remains the persona
-         name inside conversation copy only. -->
-    <string name="app_name">Entwine</string>
+    <!-- app_name comes from the backend flavor (resValue in build.gradle.kts):
+         "Entwine" (spark) / "Entwine_AWS" (aws twin, ADR-0020). Wordmark stays
+         Latin in every locale; Lucy remains the persona name in copy only. -->
 
     <!-- Invite-only enrollment (R-ENR-05): one code, no phone/email. -->
     <string name="enroll_title">קיבלתם קוד הזמנה? נכניס אותו ונתחיל</string>
@@ -19,6 +19,11 @@
     <string name="btn_send">שליחה</string>
     <string name="btn_end_session">סיום שיחה</string>
     <string name="btn_retry">נסו שוב</string>
+    <string name="btn_offline">לחצו לחיבור מחדש</string>
+
+    <!-- Mic permission denied (R-UXA-09/10): never a dead recording — banner + fix path. -->
+    <string name="mic_denied">המיקרופון כבוי. צריך אותו כדי לדבר עם לוסי — אפשר גם לכתוב.</string>
+    <string name="btn_enable_mic">הפעלת מיקרופון</string>
 
     <!-- R-UXA-08: destructive tap gated by a second, separated confirm tap. -->
     <string name="end_confirm_q">לסיים את השיחה?</string>
@@ -35,8 +40,9 @@
     <string name="crisis_emergency">מד״א 101</string>
     <string name="crisis_continue">להמשיך לדבר עם לוסי</string>
 
-    <string name="offline_copy">אין חיבור כרגע. הטקסט שלכם נשמר.</string>
+    <string name="offline_copy">אין חיבור כרגע. ננסה להתחבר מחדש.</string>
     <string name="err_generic">משהו השתבש. אפשר לנסות שוב או לכתוב.</string>
+    <string name="err_resync">רגע של חוסר סנכרון — נסו שוב.</string>
     <string name="err_stt">לא שמעתי טוב. נסו שוב או כתבו לי.</string>
     <string name="cap_suggest">אולי נסיים להיום? אפשר להמשיך אם תרצו.</string>
 

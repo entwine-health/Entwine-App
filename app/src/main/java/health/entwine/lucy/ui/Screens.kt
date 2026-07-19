@@ -99,6 +99,7 @@ private fun ConversationScreen(ui: UiSlice, vm: AppViewModel, onDeleteRequest: (
         }
         ui.errorKey?.let { ErrorBanner(it) }
         if (ui.state is AppState.Offline) OfflineBanner(onRetry = { vm.openSession() })
+        if (ui.micDenied) MicDeniedBanner(onEnable = { vm.openAppSettings() })
         if (ui.capSuggested) {
             NoticeBanner(stringResource(R.string.cap_suggest), edge = EntwineCyan)
         }
@@ -135,12 +136,20 @@ private fun ConversationScreen(ui: UiSlice, vm: AppViewModel, onDeleteRequest: (
 
         // The orb: primary control AND state display in one fixed circle
         // (R-UXA-06 ≥180dp; the ring doubles as the R-UXA-10 level meter).
-        val (label, action) = when (ui.state) {
-            AppState.Recording ->
+        val (label, action) = when {
+            // Server-initiated greeting (Session-0): she holds the floor while the
+            // state stays IdleReady — show she's speaking and DON'T let a tap start
+            // recording over her (a first-run tap used to cut off the hello).
+            ui.lucySpeaking && ui.state is AppState.IdleReady ->
+                R.string.lucy_speaking to {}
+            ui.state is AppState.Recording ->
                 R.string.btn_stop_talking to { vm.dispatch(Event.TapStop) }
-            AppState.Responding ->
+            ui.state is AppState.Responding ->
                 R.string.btn_stop_playback to { vm.dispatch(Event.TapStop) }
-            AppState.Processing -> R.string.btn_thinking to {}
+            ui.state is AppState.Processing -> R.string.btn_thinking to {}
+            // Offline: honest label + the tap retries the connection (was a silent no-op).
+            ui.state is AppState.Offline ->
+                R.string.btn_offline to { vm.openSession() }
             else -> R.string.btn_talk to { vm.tapTalk() }
         }
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -152,16 +161,8 @@ private fun ConversationScreen(ui: UiSlice, vm: AppViewModel, onDeleteRequest: (
                     label = stringResource(label),
                     onTap = action,
                 )
-                // Server-initiated speech (Session-0, language ask) keeps the
-                // state machine idle — the caption says who holds the floor.
-                if (ui.lucySpeaking && ui.state !is AppState.Responding) {
-                    Text(
-                        stringResource(R.string.lucy_speaking),
-                        fontSize = 16.sp,
-                        color = EntwineCyan,
-                        modifier = Modifier.padding(top = 4.dp),
-                    )
-                }
+                // (The server-speech caption moved INTO the orb label above — during
+                // the greeting the orb itself now reads "לוסי מדברת…", no duplicate.)
             }
         }
 

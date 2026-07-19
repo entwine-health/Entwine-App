@@ -38,10 +38,12 @@ import health.entwine.lucy.state.AppState
 private enum class OrbMode { IDLE, RECORDING, THINKING, SPEAKING, OFFLINE }
 
 private fun modeOf(state: AppState, lucySpeaking: Boolean): OrbMode = when {
+    // Offline wins over a stale lucySpeaking flag (a drop mid-playback can leave
+    // it true) — otherwise the disconnected orb would still pulse "speaking".
+    state is AppState.Offline -> OrbMode.OFFLINE
     state is AppState.Recording -> OrbMode.RECORDING
     state is AppState.Responding || lucySpeaking -> OrbMode.SPEAKING
     state is AppState.Processing -> OrbMode.THINKING
-    state is AppState.Offline -> OrbMode.OFFLINE
     else -> OrbMode.IDLE
 }
 
@@ -77,11 +79,13 @@ fun TalkOrb(
     val disc = when (mode) {
         OrbMode.RECORDING -> EntwineCoral // stop affordance — same as before the redesign
         OrbMode.IDLE -> EntwineCyan
-        OrbMode.OFFLINE -> EntwineBorder
+        // Muted-but-visible grey: EntwineBorder (#1C1C1E) vanished on the black
+        // background — the orb looked like it disappeared when offline.
+        OrbMode.OFFLINE -> EntwineDim
         else -> EntwineCyanDeep // thinking / speaking: Lucy holds the floor
     }
     val onDisc = when (mode) {
-        OrbMode.RECORDING, OrbMode.IDLE -> Color.Black
+        OrbMode.RECORDING, OrbMode.IDLE, OrbMode.OFFLINE -> Color.Black
         else -> Color.White
     }
 

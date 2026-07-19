@@ -2,7 +2,13 @@
 // The reducer decides; this class executes Actions and feeds events back.
 package health.entwine.lucy
 
+import android.Manifest
 import android.app.Application
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.Settings
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import health.entwine.lucy.audio.EnergyVad
@@ -68,6 +74,9 @@ data class UiSlice(
     val updateNeeded: Boolean = false,
     val showSttEcho: Boolean = true,
     val micLevel: Float = 0f, // live input meter while recording (R-UXA-10)
+    // Mic permission denied — surfaces the enable-mic banner instead of a dead
+    // recording (R-UXA-09/10). Refreshed on launch, permission result, and resume.
+    val micDenied: Boolean = false,
     // R-LNG-01: session language — MainActivity derives locale + layout direction.
     val lang: String = "he",
     // Cosmetic presence flag: Lucy audio is playing (incl. server-initiated
@@ -344,9 +353,36 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun tapTalk() {
+        // Never start a recording the OS won't feed: without the mic permission
+        // AudioRecord returns silence forever and the orb hangs in RECORDING
+        // (found: first-run "deny" → dead orb). Show the fix path instead.
+        if (!micGranted()) {
+            _ui.value = _ui.value.copy(micDenied = true)
+            return
+        }
         suppressReply = false
-        _ui.value = _ui.value.copy(partialReply = "")
+        _ui.value = _ui.value.copy(partialReply = "", micDenied = false)
         dispatch(Event.TapTalk)
+    }
+
+    private fun micGranted(): Boolean = ContextCompat.checkSelfPermission(
+        getApplication(), Manifest.permission.RECORD_AUDIO
+    ) == PackageManager.PERMISSION_GRANTED
+
+    /** Re-read the mic grant (permission-result / resume / launch) into the UI. */
+    fun refreshMicState() {
+        _ui.value = _ui.value.copy(micDenied = !micGranted())
+    }
+
+    /** Deep-link to this app's system settings so the user can flip the mic on. */
+    fun openAppSettings() {
+        val ctx = getApplication<Application>()
+        ctx.startActivity(
+            Intent(
+                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.fromParts("package", ctx.packageName, null),
+            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
     }
 
     fun motorTap(state: String) {
@@ -372,7 +408,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 player.feed(sig.data.copyOfRange(5, sig.data.size)) // strip envelope
             }
-            WsSignal.Dropped -> dispatch(Event.WsDrop)
+            WsSignal.Dropped -> {
+                _ui.value = _ui.value.copy(lucySpeaking = false) // no stale "speaking" while offline
+                dispatch(Event.WsDrop)
+            }
             WsSignal.AuthRejected -> {
                 store.deviceToken = null
                 _ui.value = _ui.value.copy(enrolled = false) // re-enrollment screen (§7 E_AUTH)

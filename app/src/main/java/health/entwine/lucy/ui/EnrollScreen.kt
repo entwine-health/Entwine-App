@@ -11,8 +11,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -87,6 +89,16 @@ internal fun EnrollScreen(vm: AppViewModel, deletedDone: Boolean) {
             },
             enabled = !busy && code.count(Char::isDigit) >= 4,
             modifier = Modifier.fillMaxWidth().heightIn(min = PdDim.target),
-        ) { Text(stringResource(R.string.enroll_go), fontSize = 22.sp) }
+        ) {
+            if (busy) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Text(stringResource(R.string.enroll_go), fontSize = 22.sp)
+            }
+        }
     }
 }

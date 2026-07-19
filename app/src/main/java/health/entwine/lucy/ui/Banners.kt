@@ -51,10 +51,31 @@ fun ErrorBanner(key: String) {
     val res = when (key) {
         "err_stt" -> R.string.err_stt
         "err_llm" -> R.string.err_generic
-        "err_resync" -> R.string.err_generic
+        "err_resync" -> R.string.err_resync
         else -> R.string.err_generic
     }
     NoticeBanner(androidx.compose.ui.res.stringResource(res), edge = EntwineCoral)
+}
+
+@Composable
+fun MicDeniedBanner(onEnable: () -> Unit) {
+    // R-UXA-09/10: a denied mic must never leave a dead recording — say so plainly
+    // (typing still works) and offer the one tap that fixes it.
+    NoticeBanner(
+        androidx.compose.ui.res.stringResource(R.string.mic_denied),
+        edge = EntwineCoral,
+    ) {
+        OutlinedButton(
+            onClick = onEnable,
+            modifier = Modifier.padding(top = 8.dp).heightIn(min = PdDim.target),
+        ) {
+            Text(
+                androidx.compose.ui.res.stringResource(R.string.btn_enable_mic),
+                fontSize = 18.sp,
+                color = Color.White,
+            )
+        }
+    }
 }
 
 @Composable

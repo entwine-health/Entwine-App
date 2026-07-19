@@ -4,7 +4,7 @@
      Crisis targets stay the server-configured numbers (per-country, R-LNG-06);
      these labels render whatever the server sends. -->
 <resources>
-    <string name="app_name">Entwine</string>
+    <!-- app_name is flavor-provided (build.gradle.kts resValue). -->
 
     <string name="enroll_title">Got an invite code? Enter it and we\'ll begin</string>
     <string name="enroll_code">Invite code</string>
@@ -18,6 +18,11 @@
     <string name="btn_send">Send</string>
     <string name="btn_end_session">End conversation</string>
     <string name="btn_retry">Try again</string>
+    <string name="btn_offline">Tap to reconnect</string>
+
+    <!-- Mic permission denied (R-UXA-09/10): never a dead recording — banner + fix path. -->
+    <string name="mic_denied">The microphone is off. Lucy needs it to hear you — you can also type.</string>
+    <string name="btn_enable_mic">Turn on microphone</string>
 
     <string name="end_confirm_q">End the conversation?</string>
     <string name="end_confirm_yes">Yes, end it</string>
@@ -33,8 +38,9 @@
     <string name="crisis_emergency">Emergency 101</string>
     <string name="crisis_continue">Keep talking with Lucy</string>
 
-    <string name="offline_copy">No connection right now. Your text is saved.</string>
+    <string name="offline_copy">No connection right now. Trying to reconnect.</string>
     <string name="err_generic">Something went wrong. Try again or type instead.</string>
+    <string name="err_resync">Lost sync for a moment — please try again.</string>
     <string name="err_stt">I didn\'t hear that well. Try again or write to me.</string>
     <string name="cap_suggest">Shall we wrap up for today? We can continue if you like.</string>
 

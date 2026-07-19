@@ -32,8 +32,28 @@ android {
         applicationId = "health.entwine.lucy"
         minSdk = 31
         targetSdk = 35
-        versionCode = 11
-        versionName = "0.6.0"
+        versionCode = 12
+        versionName = "0.6.1"
+    }
+    // Twin-backend flavors (ADR-0020): `spark` = production Spark edge (default
+    // package + label, unchanged); `aws` = the parallel AWS rig — own package
+    // (side-by-side install), "_AWS" label, api-aws endpoints. Endpoints are
+    // per-flavor; debug keeps the .debug suffix for both.
+    flavorDimensions += "backend"
+    productFlavors {
+        create("spark") {
+            dimension = "backend"
+            resValue("string", "app_name", "Entwine")
+            buildConfigField("String", "API_BASE", "\"https://api.entwine.health\"")
+            buildConfigField("String", "WS_URL", "\"wss://api.entwine.health/v1/session\"")
+        }
+        create("aws") {
+            dimension = "backend"
+            applicationIdSuffix = ".aws"
+            resValue("string", "app_name", "Entwine_AWS")
+            buildConfigField("String", "API_BASE", "\"https://api-aws.entwine.health\"")
+            buildConfigField("String", "WS_URL", "\"wss://api-aws.entwine.health/v1/session\"")
+        }
     }
     buildTypes {
         debug { applicationIdSuffix = ".debug" }
@@ -74,12 +94,11 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
 }
 
-// Server endpoints: pilot edge vs tailnet dev (echo bring-up).
-android.buildTypes.getByName("debug").apply {
-    buildConfigField("String", "API_BASE", "\"http://10.0.2.2:8000\"")
-    buildConfigField("String", "WS_URL", "\"ws://10.0.2.2:8000/v1/session\"")
-}
-android.buildTypes.getByName("release").apply {
-    buildConfigField("String", "API_BASE", "\"https://api.entwine.health\"")
-    buildConfigField("String", "WS_URL", "\"wss://api.entwine.health/v1/session\"")
+// Endpoints live on the FLAVORS (buildType fields would override them — AGP
+// precedence). One exception: spark+debug targets the tailnet dev box.
+android.applicationVariants.all {
+    if (flavorName == "spark" && buildType.name == "debug") {
+        buildConfigField("String", "API_BASE", "\"http://10.0.2.2:8000\"")
+        buildConfigField("String", "WS_URL", "\"ws://10.0.2.2:8000/v1/session\"")
+    }
 }
