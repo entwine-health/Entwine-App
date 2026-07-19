@@ -93,6 +93,9 @@ data class UiSlice(
     val micDenied: Boolean = false,
     // R-LNG-01: session language — MainActivity derives locale + layout direction.
     val lang: String = "he",
+    // FB-18: grammatical address gender ("m"|"f"|null) from session.ready —
+    // gender-correct on-screen text (motor labels) matching the gendered voice.
+    val gender: String? = null,
     // Cosmetic presence flag: Lucy audio is playing (incl. server-initiated
     // scripted turns where the state machine stays IdleReady — the to_solve #10
     // residue). Drives the TalkOrb speaking visual, never the state matrix.
@@ -477,6 +480,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     ),
                     showSttEcho = msg.config.showSttEcho,
                     lang = msg.config.lang,
+                    gender = msg.config.gender,
                 )
                 viewModelScope.launch { store.setLang(msg.config.lang) }
                 if (_ui.value.state is AppState.Offline) dispatch(Event.ReconnectOk)

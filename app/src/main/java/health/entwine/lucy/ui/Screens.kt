@@ -48,6 +48,20 @@ import health.entwine.lucy.state.AppState
 import health.entwine.lucy.state.Event
 import kotlinx.coroutines.delay
 
+/** Gender-correct motor label (FB-18). Hebrew has grammatical gender
+ *  (מרגיש/מרגישה, תקוע/תקועה); English does not, so non-Hebrew and unknown-gender
+ *  fall back to the base (neutral/slash) resource. SHIFTING (משתנה) is invariant. */
+private fun motorLabelRes(state: String, base: Int, lang: String, gender: String?): Int {
+    if (lang != "he") return base
+    return when {
+        state == "ON" && gender == "m" -> R.string.motor_on_m
+        state == "ON" && gender == "f" -> R.string.motor_on_f
+        state == "OFF" && gender == "m" -> R.string.motor_off_m
+        state == "OFF" && gender == "f" -> R.string.motor_off_f
+        else -> base
+    }
+}
+
 @Composable
 fun Root(vm: AppViewModel) {
     val ui by vm.ui.collectAsState()
@@ -121,6 +135,10 @@ private fun ConversationScreen(ui: UiSlice, vm: AppViewModel, onDeleteRequest: (
                 // FB-19c: the last-reported state stays filled with a ✓ so the user
                 // can see "you are here" all session, not just a transient flash.
                 val selected = ui.motorState == state
+                // FB-18: gender-correct Hebrew wording (מרגיש/מרגישה, תקוע/תקועה),
+                // matching the gendered voice; English has no grammatical gender so
+                // it keeps the base label, and unknown gender keeps the slash form.
+                val labelRes = motorLabelRes(state, label, ui.lang, ui.gender)
                 OutlinedButton(
                     onClick = { vm.motorTap(state) },
                     shape = RoundedCornerShape(20.dp),
@@ -132,7 +150,7 @@ private fun ConversationScreen(ui: UiSlice, vm: AppViewModel, onDeleteRequest: (
                     border = if (selected) null else BorderStroke(2.dp, tint),
                 ) {
                     Text(
-                        (if (selected) "✓ " else "") + stringResource(label),
+                        (if (selected) "✓ " else "") + stringResource(labelRes),
                         fontSize = 18.sp,
                         lineHeight = 24.sp,
                         textAlign = TextAlign.Center,

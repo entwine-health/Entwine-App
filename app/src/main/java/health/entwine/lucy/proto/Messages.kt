@@ -8,6 +8,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -31,6 +32,9 @@ data class SessionConfig(
     val bargeInRmsThreshold: Int = 1600,
     // WS v1.9 (R-LNG-01): session language — drives app locale + direction.
     val lang: String = "he",
+    // FB-18: grammatical address gender ("m"|"f"|null) — gender-correct on-screen
+    // text (e.g. motor labels) to match the gendered voice (R-PRF-03).
+    val gender: String? = null,
 )
 
 /** Server → client messages the app reacts to (SDD §4). */
@@ -100,6 +104,7 @@ fun parseServerMsg(text: String): ServerMsg {
                     bargeInRmsThreshold = cfg?.get("barge_in_rms_threshold")
                         ?.jsonPrimitive?.int ?: 1600,
                     lang = cfg?.get("lang")?.jsonPrimitive?.content ?: "he",
+                    gender = cfg?.get("gender")?.jsonPrimitive?.contentOrNull,
                 ),
             )
         }

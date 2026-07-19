@@ -30,9 +30,15 @@
     <string name="end_confirm_yes">כן, לסיים</string>
     <string name="end_confirm_no">להמשיך</string>
 
+    <!-- Neutral (slash) forms kept as the gender-unknown fallback; the app picks
+         the per-gender form below from session.ready gender (FB-18, R-PRF-03). -->
     <string name="motor_on">מרגיש/ה טוב</string>
     <string name="motor_shifting">משתנה</string>
     <string name="motor_off">תקוע/ה</string>
+    <string name="motor_on_m">מרגיש טוב</string>
+    <string name="motor_on_f">מרגישה טוב</string>
+    <string name="motor_off_m">תקוע</string>
+    <string name="motor_off_f">תקועה</string>
     <string name="motor_logged">נרשם ✓</string>
 
     <string name="crisis_headline">אתם לא לבד. אפשר לדבר עם מישהו עכשיו.</string>
