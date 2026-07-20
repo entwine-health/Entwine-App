@@ -10,6 +10,9 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- to_solve #19e: keep the reply playing if the app is backgrounded mid-turn. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
     <!-- allowBackup=false (R-SEC-02): the device token must never ride Google
          cloud backup — and a restored lucy_secure file is undecryptable anyway
@@ -46,5 +49,11 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+
+        <!-- Foreground keep-alive during reply playback (to_solve #19e). -->
+        <service
+            android:name=".audio.PlaybackService"
+            android:foregroundServiceType="mediaPlayback"
+            android:exported="false" />
     </application>
 </manifest>

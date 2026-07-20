@@ -13,6 +13,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import health.entwine.lucy.audio.EnergyVad
 import health.entwine.lucy.audio.PassthroughPcm16
+import health.entwine.lucy.audio.PlaybackService
 import health.entwine.lucy.audio.Player
 import health.entwine.lucy.audio.Recorder
 import health.entwine.lucy.audio.SpeechOnsetMonitor
@@ -358,7 +359,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 _ui.value = _ui.value.copy(micLevel = 0f)
             }
             Action.FLUSH_MIC -> Unit // folded into SEND_UTTER_END_*
-            Action.TTS_STOP -> player.stop()
+            Action.TTS_STOP -> { player.stop(); keepPlaybackAlive(false) }
             Action.SUPPRESS_REPLY -> suppressReply = true
             Action.SEND_UTTER_START -> return client.send(ClientMsg.utteranceStart())
             Action.SEND_UTTER_END_VAD ->
@@ -457,6 +458,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
             WsSignal.Dropped -> {
                 _ui.value = _ui.value.copy(lucySpeaking = false) // no stale "speaking" while offline
+                keepPlaybackAlive(false)
                 dispatch(Event.WsDrop)
             }
             WsSignal.AuthRejected -> {
@@ -515,16 +517,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
             is ServerMsg.TtsBegin -> {
                 _ui.value = _ui.value.copy(lucySpeaking = true)
+                keepPlaybackAlive(true) // keep the reply alive if the app is backgrounded (#19e)
                 player.begin(msg.sampleRate)
             }
             is ServerMsg.TtsDone -> {
                 _ui.value = _ui.value.copy(lucySpeaking = false)
+                keepPlaybackAlive(false)
                 dispatch(Event.TtsPlaybackDone)
             }
             is ServerMsg.UtteranceEndpoint -> // wrap fast-path (WS v1.6, R-LOOP-10)
                 dispatch(Event.ServerEndpoint)
             is ServerMsg.TurnCancelled -> {
                 _ui.value = _ui.value.copy(lucySpeaking = false)
+                keepPlaybackAlive(false)
                 suppressReply = false // cancelled exchange's stragglers already dropped
                 _ui.value = _ui.value.copy(partialReply = "")
                 dispatch(Event.TurnCancelled)
@@ -550,11 +555,25 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Foreground keep-alive so a backgrounded app doesn't lose Lucy's reply
+     *  mid-sentence (to_solve #19e). Tied to the playback lifecycle: on at
+     *  tts.begin, off at tts.done / TTS_STOP / drop / cancel / teardown. A refused
+     *  background start (API 12+ edge) degrades to the old behaviour, never crashes. */
+    private fun keepPlaybackAlive(on: Boolean) {
+        val ctx = getApplication<Application>()
+        try {
+            if (on) PlaybackService.start(ctx) else PlaybackService.stop(ctx)
+        } catch (e: Exception) {
+            android.util.Log.w("Lucy", "playback keep-alive ${if (on) "start" else "stop"}: $e")
+        }
+    }
+
     override fun onCleared() {
         watchdog?.cancel()
         recorder.stop()
         bargeMonitor.stop()
         player.stop()
+        keepPlaybackAlive(false)
         client.close()
     }
 }

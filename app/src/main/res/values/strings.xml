@@ -78,4 +78,6 @@
     <string name="delete_cancel">לא, לחזור לשיחה</string>
     <string name="delete_done">הבקשה התקבלה. האיסוף נפסק והנתונים יימחקו תוך ימים ספורים.</string>
     <string name="delete_failed">המחיקה לא הושלמה — בדקו את החיבור ונסו שוב.</string>
+    <string name="playback_notif_title">לוסי מדברת…</string>
+    <string name="playback_channel_name">השמעת קול</string>
 </resources>

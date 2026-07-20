@@ -70,4 +70,6 @@
     <string name="delete_cancel">No, back to the conversation</string>
     <string name="delete_done">Request received. Collection has stopped and your data will be erased within a few days.</string>
     <string name="delete_failed">Deletion didn\'t complete — check the connection and try again.</string>
+    <string name="playback_notif_title">Lucy is speaking…</string>
+    <string name="playback_channel_name">Voice playback</string>
 </resources>
