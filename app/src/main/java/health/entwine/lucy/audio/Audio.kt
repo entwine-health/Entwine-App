@@ -19,6 +19,9 @@ import health.entwine.lucy.proto.encodeFrame
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
@@ -217,11 +220,19 @@ class SpeechOnsetMonitor(private val scope: CoroutineScope) {
 /** Streamed reply playback: first chunk starts audio immediately (R-LAT-03). */
 class Player(private val codec: WireCodec) {
     private var track: AudioTrack? = null
+    // FB-20 field test 2026-07-20: AudioTrack.write() BLOCKS, and a ~0.5 s track
+    // buffer + a fast chunk stream made it block the *caller* — the main-thread
+    // WS collector — for seconds → ANR ("app not responding" while Lucy talks),
+    // and starved Compose so captions painted seconds late. Decode stays on the
+    // caller (cheap); the blocking write runs on a dedicated single-thread drain.
+    // Single consumer = FIFO = playback order preserved.
+    private var scope: CoroutineScope? = null
+    private var queue: Channel<ShortArray>? = null
 
     fun begin(sampleRate: Int) {
         stop()
         pending = ByteArray(0) // never carry a byte across replies
-        track = AudioTrack.Builder()
+        val t = AudioTrack.Builder()
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_ASSISTANT)
@@ -239,6 +250,19 @@ class Player(private val codec: WireCodec) {
             .setTransferMode(AudioTrack.MODE_STREAM)
             .build()
             .also { it.play() }
+        track = t
+        // UNLIMITED: the server already paces the stream (_stream_cached) and live
+        // synth arrives slower than playback, so the queue tracks a small backlog;
+        // the blocking write to the 0.5 s track buffer self-paces the drain.
+        val q = Channel<ShortArray>(Channel.UNLIMITED)
+        val s = CoroutineScope(Dispatchers.IO + SupervisorJob())
+        queue = q
+        scope = s
+        s.launch {
+            // `t` captured (not the field) → no cross-thread visibility gap; a
+            // write after stop()'s release just throws and is swallowed.
+            for (pcm in q) runCatching { t.write(pcm, 0, pcm.size) }
+        }
     }
 
     // Implements: SDD_WS_Protocol v1.8 §2 (whole-sample framing invariant).
@@ -255,13 +279,17 @@ class Player(private val codec: WireCodec) {
         pending = if (whole == buf.size) ByteArray(0) else buf.copyOfRange(whole, buf.size)
         if (whole == 0) return
         val pcm = codec.decode(if (whole == buf.size) buf else buf.copyOfRange(0, whole))
-        track?.write(pcm, 0, pcm.size)
+        queue?.trySend(pcm) // non-blocking handoff; UNLIMITED never drops a frame
     }
 
     /** Hard cell §3.1: crisis stops audio *first* and discards — never pause. */
     fun stop() {
+        scope?.cancel() // stop the drain
+        scope = null
+        queue?.close()
+        queue = null
         track?.let {
-            runCatching { it.pause(); it.flush(); it.stop() }
+            runCatching { it.pause(); it.flush(); it.stop() } // flush unblocks an in-flight write
             it.release()
         }
         track = null

@@ -74,10 +74,19 @@ class MainActivity : ComponentActivity() {
             // the invite screen — so the mic / notification / battery prompts never
             // surface at random times mid-conversation. An enrolled or already-
             // granted device skips straight through.
-            var permsGate by remember { mutableStateOf(ui.enrolled || micGranted()) }
-            LaunchedEffect(Unit) {
-                if (!permsGate) firstRunPermissions { permsGate = true }
-            }
+            // FB-20f field re-test 2026-07-20: the old predicate (ui.enrolled ||
+            // micGranted()) opened the gate whenever mic was already granted OR the
+            // device was enrolled, so notification + battery prompts were skipped
+            // here and surfaced later "at random times". Gate on the first-run
+            // sequence having RUN, so ALL prompts are front-loaded before the invite
+            // screen. Self-terminating: granted runtime perms re-show no dialog and
+            // askBatteryExemption() no-ops when already exempt (fully-permissioned
+            // users see one SetupScreen frame).
+            // ponytail: re-nags on every cold start only for a user who keeps
+            // declining battery-opt. Upgrade: persist a `firstRunDone` bool via
+            // Store's Keystore-prefs (Store.kt deviceToken pattern) and gate on it.
+            var permsGate by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) { firstRunPermissions { permsGate = true } }
             CompositionLocalProvider(LocalContext provides localized) {
                 EntwineTheme(ui.lang) {
                     if (permsGate) Root(vm) else SetupScreen()
