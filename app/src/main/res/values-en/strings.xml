@@ -72,4 +72,5 @@
     <string name="delete_failed">Deletion didn\'t complete — check the connection and try again.</string>
     <string name="playback_notif_title">Lucy is speaking…</string>
     <string name="playback_channel_name">Voice playback</string>
+    <string name="replay_hint">▶ Tap to replay</string>
 </resources>

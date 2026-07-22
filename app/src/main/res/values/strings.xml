@@ -80,4 +80,5 @@
     <string name="delete_failed">המחיקה לא הושלמה — בדקו את החיבור ונסו שוב.</string>
     <string name="playback_notif_title">לוסי מדברת…</string>
     <string name="playback_channel_name">השמעת קול</string>
+    <string name="replay_hint">▶ הקש לשמיעה חוזרת</string>
 </resources>

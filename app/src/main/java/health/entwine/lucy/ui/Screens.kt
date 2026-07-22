@@ -106,6 +106,8 @@ private fun ConversationScreen(ui: UiSlice, vm: AppViewModel, onDeleteRequest: (
         TranscriptList(
             ui.transcript,
             ui.partialReply,
+            ui.replayable,
+            { vm.replay(it) },
             Modifier.weight(1f).fillMaxWidth().padding(vertical = 6.dp),
         )
 

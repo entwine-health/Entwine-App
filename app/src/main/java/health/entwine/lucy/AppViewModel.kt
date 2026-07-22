@@ -78,6 +78,9 @@ data class UiSlice(
     val state: AppState = AppState.IdleReady,
     val enrolled: Boolean = false,
     val transcript: List<Pair<String, String>> = emptyList(), // (who, text)
+    // #22d tap-to-replay: transcript indices whose Lucy audio is buffered this
+    // session and can be replayed on tap.
+    val replayable: Set<Int> = emptySet(),
     val partialReply: String = "",
     val motorChip: String? = null,
     // FB-19c: the currently-reported motor state ("ON"|"SHIFTING"|"OFF"), so the
@@ -112,6 +115,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val codec = PassthroughPcm16()
     private val recorder = Recorder(codec, viewModelScope)
     private val player = Player(codec)
+    // #22d tap-to-replay (this session): buffer each reply's PCM as it plays, keyed
+    // by its transcript index, and replay on a dedicated player so it never disturbs
+    // a live turn. Memory-capped to the last REPLAY_CAP replies.
+    private val replayPlayer = Player(codec)
+    private var replayBuf: java.io.ByteArrayOutputStream? = null
+    private var replaySr = 24_000
+    private val replayAudio = LinkedHashMap<Int, Pair<ByteArray, Int>>() // index -> (pcm, sr)
+    private val REPLAY_CAP = 20
 
     private val _ui = MutableStateFlow(
         UiSlice(
@@ -454,7 +465,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     client.send(ClientMsg.ackPlaybackStart(currentSeq, Instant.now().toString()))
                     dispatch(Event.FirstTtsChunk)
                 }
-                player.feed(sig.data.copyOfRange(5, sig.data.size)) // strip envelope
+                val pcm = sig.data.copyOfRange(5, sig.data.size) // strip envelope
+                player.feed(pcm)
+                replayBuf?.write(pcm) // buffer this reply for tap-to-replay (#22d)
             }
             WsSignal.Dropped -> {
                 _ui.value = _ui.value.copy(lucySpeaking = false) // no stale "speaking" while offline
@@ -518,11 +531,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             is ServerMsg.TtsBegin -> {
                 _ui.value = _ui.value.copy(lucySpeaking = true)
                 keepPlaybackAlive(true) // keep the reply alive if the app is backgrounded (#19e)
+                replayBuf = java.io.ByteArrayOutputStream() // start buffering for #22d
+                replaySr = msg.sampleRate
                 player.begin(msg.sampleRate)
             }
             is ServerMsg.TtsDone -> {
                 _ui.value = _ui.value.copy(lucySpeaking = false)
                 keepPlaybackAlive(false)
+                storeReplay() // pair the buffered audio with its transcript line (#22d)
                 dispatch(Event.TtsPlaybackDone)
             }
             is ServerMsg.UtteranceEndpoint -> // wrap fast-path (WS v1.6, R-LOOP-10)
@@ -568,11 +584,35 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** #22d: pair the just-finished reply's buffered PCM with its transcript line.
+     *  Keyed by transcript index — the list is append-only so the index is stable,
+     *  and `reply.done` added this reply's Lucy line before `tts.begin` fired, so the
+     *  last line at `tts.done` is this reply's. Memory-capped; oldest evicted. */
+    private fun storeReplay() {
+        val buf = replayBuf ?: return
+        replayBuf = null
+        val pcm = buf.toByteArray()
+        val idx = _ui.value.transcript.lastIndex
+        if (pcm.isEmpty() || idx < 0 || _ui.value.transcript[idx].first != "lucy") return
+        replayAudio[idx] = pcm to replaySr
+        while (replayAudio.size > REPLAY_CAP) replayAudio.remove(replayAudio.keys.first())
+        _ui.value = _ui.value.copy(replayable = replayAudio.keys.toSet())
+    }
+
+    /** #22d: replay a past Lucy line's audio on tap. No-op if it isn't buffered
+     *  (scripted line with no audio, evicted, or a "me" line). */
+    fun replay(index: Int) {
+        val (pcm, sr) = replayAudio[index] ?: return
+        replayPlayer.begin(sr) // begin() stops any prior replay; separate from the live player
+        replayPlayer.feed(pcm)
+    }
+
     override fun onCleared() {
         watchdog?.cancel()
         recorder.stop()
         bargeMonitor.stop()
         player.stop()
+        replayPlayer.stop()
         keepPlaybackAlive(false)
         client.close()
     }
