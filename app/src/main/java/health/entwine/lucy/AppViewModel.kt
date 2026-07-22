@@ -17,6 +17,7 @@ import health.entwine.lucy.audio.PlaybackService
 import health.entwine.lucy.audio.Player
 import health.entwine.lucy.audio.Recorder
 import health.entwine.lucy.audio.SpeechOnsetMonitor
+import health.entwine.lucy.audio.WaitTone
 import health.entwine.lucy.proto.ClientMsg
 import health.entwine.lucy.proto.CrisisTarget
 import health.entwine.lucy.proto.ServerMsg
@@ -123,6 +124,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var replaySr = 24_000
     private val replayAudio = LinkedHashMap<Int, Pair<ByteArray, Int>>() // index -> (pcm, sr)
     private val REPLAY_CAP = 20
+    // #22 #4: soft "thinking" tone while Lucy composes (replaces the spoken fillers).
+    private val waitTone = WaitTone()
+    private var waitToneJob: Job? = null
 
     private val _ui = MutableStateFlow(
         UiSlice(
@@ -280,6 +284,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val prev = _ui.value.state
         val t = reduce(prev, event, crisisTargets)
         _ui.value = _ui.value.copy(state = t.next, errorKey = null)
+        // #22 #4: the "thinking" wait tone tracks the Processing state — start ~600 ms
+        // after entering it (fast warm turns answer first and skip it), stop the instant
+        // we leave (first reply audio → Responding, or error / drop / idle). The turn
+        // watchdog bounds Processing, so the tone can't loop past the real worst case.
+        if (t.next is AppState.Processing && prev !is AppState.Processing) {
+            waitToneJob = viewModelScope.launch {
+                delay(600)
+                if (_ui.value.state is AppState.Processing) waitTone.start()
+            }
+        } else if (prev is AppState.Processing && t.next !is AppState.Processing) {
+            waitToneJob?.cancel()
+            waitTone.stop()
+        }
         // Reason: a send that never reached the socket means no answer is
         // coming, so the turn would hang forever with an inert button (found
         // live 2026-07-17). Treat undeliverable as the drop it actually is.
@@ -613,6 +630,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         bargeMonitor.stop()
         player.stop()
         replayPlayer.stop()
+        waitTone.stop()
         keepPlaybackAlive(false)
         client.close()
     }

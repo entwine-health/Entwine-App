@@ -24,6 +24,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 
 const val MIC_SAMPLE_RATE = 16_000
 const val FRAME_MS = 20
@@ -292,6 +295,66 @@ class Player(private val codec: WireCodec) {
             runCatching { it.pause(); it.flush(); it.stop() } // flush unblocks an in-flight write
             it.release()
         }
+        track = null
+    }
+}
+
+/** "Thinking" wait cue (to_solve #22 #4): a soft, steady tone pulse played while
+ *  Lucy composes a reply, replacing the old spoken fillers. Design from the
+ *  2026-07-22 research pass (elderly-PD-appropriate): ~440 Hz sine, 150 ms pulse
+ *  (25 ms raised-cosine fades → no click), one per 1.6 s, steady pitch/level, peak
+ *  ~ −18 dBFS (subordinate to speech), warm — NOT a hospital-monitor beep, no rising
+ *  pitch (which reads as alarm). One pre-computed [pulse+silence] period looped in
+ *  hardware (MODE_STATIC) → zero runtime cost. Caller starts it ~600 ms into the
+ *  wait and stops it on the first reply audio. */
+class WaitTone(private val rate: Int = 24_000) {
+    private var track: AudioTrack? = null
+    private val period: ShortArray = buildPeriod()
+
+    private fun buildPeriod(): ShortArray {
+        val n = (rate * 1.6).toInt()
+        val pulse = (rate * 0.150).toInt()
+        val fade = (rate * 0.025).toInt()
+        val amp = Short.MAX_VALUE * 0.125 // ~ −18 dBFS
+        val out = ShortArray(n) // remainder stays silence
+        for (i in 0 until pulse) {
+            val env = when {
+                i < fade -> 0.5 * (1 - cos(PI * i / fade))
+                i > pulse - fade -> 0.5 * (1 - cos(PI * (pulse - i) / fade))
+                else -> 1.0
+            }
+            out[i] = (amp * env * sin(2 * PI * 440.0 * i / rate)).toInt().toShort()
+        }
+        return out
+    }
+
+    fun start() {
+        stop()
+        val t = AudioTrack.Builder()
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION) // ducks under speech
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+            )
+            .setAudioFormat(
+                AudioFormat.Builder()
+                    .setSampleRate(rate)
+                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                    .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                    .build()
+            )
+            .setBufferSizeInBytes(period.size * 2)
+            .setTransferMode(AudioTrack.MODE_STATIC)
+            .build()
+        t.write(period, 0, period.size)
+        t.setLoopPoints(0, period.size, -1) // −1 = loop forever, in hardware
+        t.play()
+        track = t
+    }
+
+    fun stop() {
+        track?.let { runCatching { it.pause(); it.flush(); it.release() } }
         track = null
     }
 }
