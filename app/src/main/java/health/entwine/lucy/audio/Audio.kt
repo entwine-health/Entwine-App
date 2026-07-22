@@ -303,7 +303,8 @@ class Player(private val codec: WireCodec) {
  *  Lucy composes a reply, replacing the old spoken fillers. Design from the
  *  2026-07-22 research pass (elderly-PD-appropriate): ~440 Hz sine, 150 ms pulse
  *  (25 ms raised-cosine fades → no click), one per 1.6 s, steady pitch/level, peak
- *  ~ −18 dBFS (subordinate to speech), warm — NOT a hospital-monitor beep, no rising
+ *  ~ −12 dBFS (2× louder — to_solve #2, field round-5; still subordinate to speech),
+ *  warm — NOT a hospital-monitor beep, no rising
  *  pitch (which reads as alarm). One pre-computed [pulse+silence] period looped in
  *  hardware (MODE_STATIC) → zero runtime cost. Caller starts it ~600 ms into the
  *  wait and stops it on the first reply audio. */
@@ -315,7 +316,7 @@ class WaitTone(private val rate: Int = 24_000) {
         val n = (rate * 1.6).toInt()
         val pulse = (rate * 0.150).toInt()
         val fade = (rate * 0.025).toInt()
-        val amp = Short.MAX_VALUE * 0.125 // ~ −18 dBFS
+        val amp = Short.MAX_VALUE * 0.25 // ~ −12 dBFS (to_solve #2: 2× louder, field round-5)
         val out = ShortArray(n) // remainder stays silence
         for (i in 0 until pulse) {
             val env = when {
