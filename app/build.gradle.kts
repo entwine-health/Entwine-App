@@ -32,8 +32,8 @@ android {
         applicationId = "health.entwine.lucy"
         minSdk = 31
         targetSdk = 35
-        versionCode = 22
-        versionName = "0.6.11"
+        versionCode = 23
+        versionName = "0.6.12"
     }
     // Twin-backend flavors (ADR-0020): `spark` = production Spark edge (default
     // package + label, unchanged); `aws` = the parallel AWS rig — own package

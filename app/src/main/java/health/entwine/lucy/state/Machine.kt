@@ -62,6 +62,11 @@ fun reduce(state: AppState, event: Event, crisisTargets: List<CrisisTarget>): Tr
         return Transition(AppState.Crisis(crisisTargets), cleanup)
     }
 
+    // #26g/#26h: a server `session.saved` — from End-conversation OR the idle timeout —
+    // ends the conversation from ANY state: finish the activity (EXIT_APP). Without this,
+    // End did nothing outside Closing, and an idle close just fell through to reconnect.
+    if (event is Event.SessionSaved) return Transition(AppState.Closing, listOf(Action.EXIT_APP))
+
     return when (state) {
         AppState.IdleReady -> when (event) {
             Event.TapTalk -> Transition(

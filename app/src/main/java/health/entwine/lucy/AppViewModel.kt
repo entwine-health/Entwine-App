@@ -31,7 +31,9 @@ import health.entwine.lucy.ws.WsSignal
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaType
@@ -149,6 +151,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
     val ui: StateFlow<UiSlice> = _ui
+
+    // #26g: one-shot "conversation ended → leave the screen" signal. EXIT_APP was a
+    // no-op ("the Activity observes Closing terminal state") but NOTHING observed it,
+    // so tapping End conversation + confirming appeared to do nothing. MainActivity
+    // collects this and finishes the activity (reopening starts a fresh session).
+    private val _exitApp = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val exitApp: SharedFlow<Unit> = _exitApp
 
     private var crisisTargets: List<CrisisTarget> = BAKED_TARGETS
     private var vadSilenceMs = 2000
@@ -406,7 +415,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             Action.SEND_CLOSE -> return client.send(ClientMsg.sessionClose())
             Action.PERSIST_TEXT -> Unit // Compose field persists via Store on change
             Action.RECONNECT -> Unit // SessionClient reconnects on failure callbacks
-            Action.EXIT_APP -> Unit // Activity observes Closing terminal state
+            Action.EXIT_APP -> { _exitApp.tryEmit(Unit) } // #26g: MainActivity finishes on this
         }
         return true
     }

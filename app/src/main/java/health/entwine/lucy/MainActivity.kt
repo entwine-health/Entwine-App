@@ -60,6 +60,9 @@ class MainActivity : ComponentActivity() {
             // R-LNG-01: session language drives strings locale + layout direction,
             // live (language.updated recomposes — no activity recreate needed).
             val ui by vm.ui.collectAsState()
+            // #26g: End conversation → server saves + closes → ViewModel emits exitApp →
+            // finish the activity (a benign "ended"; reopening starts a fresh session).
+            LaunchedEffect(Unit) { vm.exitApp.collect { finish() } }
             val base = LocalContext.current
             val localized = remember(ui.lang) {
                 val cfg = Configuration(base.resources.configuration)
