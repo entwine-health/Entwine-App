@@ -51,6 +51,12 @@ sealed interface ServerMsg {
     data class ReplyDone(val exchangeSeq: Int, val hasTts: Boolean) : ServerMsg
     data class UtteranceEndpoint(val reason: String) : ServerMsg // WS v1.6, R-LOOP-10
     data class TurnCancelled(val exchangeSeq: Int) : ServerMsg // WS v1.6, barge-in ack
+
+    /** WS v1.11 §8.1a — "not yet", not an error. Lucy is still answering the
+     *  previous turn. Deliberately NOT an [Error]: the old `E_SESSION_STATE`
+     *  answer put the client in Responding→RecoverableError, which fires
+     *  `TTS_STOP` and killed the reply audio (#22a). */
+    data class TurnBusy(val reason: String) : ServerMsg
     data class TtsBegin(val exchangeSeq: Int, val sampleRate: Int) : ServerMsg
     data class TtsDone(val exchangeSeq: Int) : ServerMsg
     data class MotorAck(val textKey: String) : ServerMsg
@@ -123,6 +129,9 @@ fun parseServerMsg(text: String): ServerMsg {
             obj["reason"]?.jsonPrimitive?.content ?: "wrap_phrase"
         )
         "turn.cancelled" -> ServerMsg.TurnCancelled(seq())
+        "turn.busy" -> ServerMsg.TurnBusy(
+            obj["reason"]?.jsonPrimitive?.content ?: "turn_in_flight"
+        )
         "motor.ack" -> ServerMsg.MotorAck(obj["text_key"]?.jsonPrimitive?.content ?: "")
         "crisis.show" -> ServerMsg.CrisisShow(seq(), targets(obj, "targets"))
         "cap.suggest" -> ServerMsg.CapSuggest(seq())

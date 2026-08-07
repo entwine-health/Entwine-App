@@ -587,6 +587,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 _ui.value = _ui.value.copy(lang = msg.lang)
                 viewModelScope.launch { store.setLang(msg.lang) }
             }
+            is ServerMsg.TurnBusy -> {
+                // WS v1.11 §8.1a(c): "one moment", not an error. NO dispatch — the
+                // state machine must not move: from Responding, RecoverableError
+                // fires TTS_STOP and kills the reply the person is still hearing
+                // (#22a). Just show the calm notice and let it fade.
+                flashError("turn_busy")
+            }
             is ServerMsg.Error -> {
                 // Reason: dispatch() clears errorKey, so setting it first meant
                 // the server's own copy never reached the screen (R-LOOP-03).

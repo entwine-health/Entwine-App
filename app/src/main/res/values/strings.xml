@@ -49,6 +49,8 @@
     <string name="offline_copy">אין חיבור כרגע. ננסה להתחבר מחדש.</string>
     <string name="err_generic">משהו השתבש. אפשר לנסות שוב או לכתוב.</string>
     <string name="err_resync">רגע של חוסר סנכרון — נסו שוב.</string>
+    <!-- WS v1.11 §8.1a: "not yet", not an error. Engineering draft (Q-23). -->
+    <string name="turn_busy">רגע, אני עוד עונה…</string>
     <string name="err_stt">לא שמעתי טוב. נסו שוב או כתבו לי.</string>
     <string name="cap_suggest">אולי נסיים להיום? אפשר להמשיך אם תרצו.</string>
 

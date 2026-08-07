@@ -52,6 +52,8 @@ fun ErrorBanner(key: String) {
         "err_stt" -> R.string.err_stt
         "err_llm" -> R.string.err_generic
         "err_resync" -> R.string.err_resync
+        // WS v1.11 §8.1a: not an error at all — Lucy is still answering.
+        "turn_busy" -> R.string.turn_busy
         else -> R.string.err_generic
     }
     // FB-19f: recoverable hiccups use the calm/dim edge, NEVER the alarm red

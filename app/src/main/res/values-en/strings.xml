@@ -41,6 +41,8 @@
     <string name="offline_copy">No connection right now. Trying to reconnect.</string>
     <string name="err_generic">Something went wrong. Try again or type instead.</string>
     <string name="err_resync">Lost sync for a moment — please try again.</string>
+    <!-- WS v1.11 §8.1a: "not yet", not an error. Engineering draft (Q-23). -->
+    <string name="turn_busy">One moment — I\'m still answering…</string>
     <string name="err_stt">I didn\'t hear that well. Try again or write to me.</string>
     <string name="cap_suggest">Shall we wrap up for today? We can continue if you like.</string>
 
